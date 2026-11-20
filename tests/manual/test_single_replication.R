@@ -197,3 +197,13 @@ for (censor_probability in c(0, 0.10, 0.25, 0.40, 0.75)) {
   stopifnot(all(is.na(level_result$estimates$quantiles[
     c(0.025, 0.10, 0.50, 0.90, 0.975) <= mean(censored_level)])))
 }
+
+stopifnot(mle_wrapped$parameters$vcov_status %in% c("valid", "unavailable_or_invalid"))
+bad_numeric_id <- run_single_replication(base_sample, replicate_id = Inf,
+  methods = "substitute_loq")
+stopifnot(inherits(try(collect_replication_results(list(bad_numeric_id)), silent = TRUE),
+  "try-error"))
+bad_character_id <- run_single_replication(base_sample, replicate_id = "",
+  methods = "substitute_loq")
+stopifnot(inherits(try(collect_replication_results(list(bad_character_id)), silent = TRUE),
+  "try-error"))
