@@ -89,6 +89,7 @@ for (cp in validation_settings$censoring_probabilities) {
 
 # Reverse-KM empirical quantile validation. Probabilities at/below F(LOQ) are
 # structurally unidentified; above it, only finite returned values are scored.
+# Performance metrics are conditional on finite return; return rates use every draw.
 reverse_probs <- c(0.10, 0.25, 0.40, 0.50, 0.75, 0.90)
 reverse_sim <- list()
 for (cp in validation_settings$censoring_probabilities) {
@@ -158,26 +159,35 @@ for (nm in names(ros_sim)) {
   lines <- c(lines, paste0("### ", nm, " (F(LOQ)=", z$probability, ")"), "",
     paste0("Successful: ", z$success, "/", validation_settings$replicates,
       "; failures: ", z$failure, "; non-identifiable: ", z$non_identifiable), "",
-    "| Statistic | Reference | Bias | RMSE | Empirical SD |", "|---|---|---:|---:|---:|")
+    "Reconstruction error against the same replicate's latent sample:", "",
+    "| Statistic | Reference | Reconstruction-error bias | Reconstruction-error RMSE | SD of reconstruction errors |",
+    "|---|---|---:|---:|---:|")
   for (stat in names(z$metrics)) {
     a <- z$metrics[[stat]]$vs_sample; b <- z$metrics[[stat]]$vs_population
-    lines <- c(lines, paste0("| ", stat, " vs same-replicate latent sample | 0 | ",
-      paste(signif(a[c("bias", "rmse", "empirical_sd")], 5), collapse = " | "), " |"),
-      paste0("| ", stat, " vs population parameter | ", signif(unlist(lognormal_moments(0, 1))[[stat]], 5), " | ",
+    lines <- c(lines, paste0("| ", stat, " | Same-replicate latent-sample statistic | ",
+      paste(signif(a[c("bias", "rmse", "empirical_sd")], 5), collapse = " | "), " |"))
+  }
+  lines <- c(lines, "", "Estimation error against the population parameter:", "",
+    "| Statistic | Population parameter | Estimation bias | Estimation RMSE | Empirical SD of ROS estimates |",
+    "|---|---:|---:|---:|---:|")
+  for (stat in names(z$metrics)) {
+    b <- z$metrics[[stat]]$vs_population
+    lines <- c(lines, paste0("| ", stat, " | ", signif(unlist(lognormal_moments(0, 1))[[stat]], 5), " | ",
       paste(signif(b[c("bias", "rmse", "empirical_sd")], 5), collapse = " | "), " |"))
   }
   lines <- c(lines, "")
 }
 lines <- c(lines, "## Reverse KM quantiles", "",
-  "For each common LOQ, probabilities p <= F(LOQ) are listed as structurally non-identifiable and are not scored. For p > F(LOQ), quantiles are scored only when NADA returns finite values; the finite-return rate captures numerical/tail limitations separately.", "")
+  "For each common LOQ, probabilities p <= F(LOQ) are theoretically non-identifiable and are not scored. For p > F(LOQ), finite-return rates use all simulation replicates. Bias, RMSE, and empirical SD are conditional on NADA returning a finite quantile estimate and are calculated only among those finite estimates. This separates structural non-identifiability, non-finite return at an otherwise identifiable probability, and estimation error among finite returns.", "")
 for (nm in names(reverse_sim)) {
   z <- reverse_sim[[nm]]
   lines <- c(lines, paste0("### ", nm, " (F(LOQ)=", z$probability, ")"), "",
     paste0("Theoretically non-identifiable: ", if (length(z$theoretical_non_identifiable))
       paste(z$theoretical_non_identifiable, collapse = ", ") else "none among requested probabilities",
       "; failed fits: ", z$failed_fits), "")
-  for (q in names(z$metrics)) lines <- c(lines, paste0("- ", q, " finite return rate: ",
-    signif(z$finite_return_rate[[q]], 4), "; bias/RMSE/empirical SD: ",
+  for (q in names(z$metrics)) lines <- c(lines, paste0("- ", q, " (p > F(LOQ)): finite-return rate across all ",
+    validation_settings$reverse_km_replicates, " replicates = ", signif(z$finite_return_rate[[q]], 4),
+    "; conditional-on-finite-return bias/RMSE/empirical SD: ",
     paste(signif(z$metrics[[q]], 5), collapse = "/")))
   lines <- c(lines, "")
 }
