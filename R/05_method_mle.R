@@ -50,10 +50,15 @@ apply_mle_method <- function(observed, replicate_id = NA_integer_) {
   status <- if (!converged) "non_converged" else if (!finite_params || !finite_estimates) "failed" else "success"
   if (!finite_estimates) estimates <- list(mean = NA_real_, median = NA_real_, sd = NA_real_, cv = NA_real_)
   vc <- tryCatch(stats::vcov(sr), error = function(e) NULL)
-  se <- if (!is.null(vc)) sqrt(diag(vc)) else numeric()
+  valid_vcov <- is.matrix(vc) && is.numeric(vc) && nrow(vc) >= 2L &&
+    ncol(vc) >= 2L && all(is.finite(vc[seq_len(2L), seq_len(2L), drop = FALSE]))
+  se <- if (valid_vcov) {
+    diagonal <- diag(vc)[seq_len(2L)]
+    if (all(is.finite(diagonal)) && all(diagonal >= 0)) sqrt(diagonal) else rep(NA_real_, 2L)
+  } else rep(NA_real_, 2L)
   parameters <- list(meanlog = mu, sdlog = sigma,
-    se_meanlog = if (length(se) >= 1L) unname(se[1L]) else NA_real_,
-    se_log_sdlog = if (length(se) >= 2L) unname(se[2L]) else NA_real_)
+    se_meanlog = unname(se[1L]), se_log_sdlog = unname(se[2L]),
+    vcov_status = if (valid_vcov && all(is.finite(se))) "valid" else "unavailable_or_invalid")
   new_method_result(replicate_id, "mle_lognormal", observed, status,
     inference_status = "not_implemented", warnings = captured$warnings,
     error = if (status == "non_converged") "survreg did not converge" else NA_character_,
