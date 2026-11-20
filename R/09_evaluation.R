@@ -38,8 +38,11 @@ collect_replication_results <- function(replications) {
   if (!is.list(replications) || !length(replications) || any(!vapply(replications, inherits, logical(1),
       what = "single_replication_result"))) stop("All inputs must be single_replication_result objects")
   replicate_ids <- lapply(replications, function(x) x$replicate_id)
-  valid_ids <- vapply(replicate_ids, function(x) length(x) == 1L && !is.na(x) &&
-    (is.character(x) || is.numeric(x)), logical(1))
+  valid_ids <- vapply(replicate_ids, function(x) {
+    if (length(x) != 1L || is.na(x)) return(FALSE)
+    if (is.character(x)) return(nzchar(x))
+    is.numeric(x) && is.finite(x)
+  }, logical(1))
   if (!all(valid_ids)) stop("Each replication must have one non-missing character or numeric replicate_id")
   id_labels <- vapply(replicate_ids, as.character, character(1))
   if (anyDuplicated(id_labels)) stop("replicate_id values must be unique")
