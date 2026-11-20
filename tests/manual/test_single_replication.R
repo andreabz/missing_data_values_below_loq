@@ -137,8 +137,6 @@ stopifnot(is.na(single$methods$reverse_km$estimates$mean))
 stopifnot(is.na(single$methods$mle_lognormal$inference$ucl95))
 stopifnot(!"truth" %in% names(single))
 
-cat("Single replication functional checks passed.\n")
-print(checks)
 
 
 # Input-contract edge cases introduced in the review.
@@ -207,3 +205,6 @@ bad_character_id <- run_single_replication(base_sample, replicate_id = "",
   methods = "substitute_loq")
 stopifnot(inherits(try(collect_replication_results(list(bad_character_id)), silent = TRUE),
   "try-error"))
+
+cat("Single replication functional checks passed.\n")
+print(checks)
