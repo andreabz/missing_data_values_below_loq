@@ -48,6 +48,18 @@ apply_ros_method <- function(observed, replicate_id = NA_integer_) {
     details = list(fit = fit, bootstrap = "not_implemented; future bootstrap must refit ROS each draw"))
 }
 
-bootstrap_ros <- function(...) {
-  stop("ROS bootstrap is not implemented; when added it must refit ROS in every resample.")
+bootstrap_ros <- function(observed, estimate = NULL, B = 999L, conf.level = 0.95) {
+  if (is.null(estimate)) {
+    original <- apply_ros_method(observed)
+    if (original$estimate_status != "success") {
+      non_identifiable <- original$estimate_status == "non_identifiable"
+      return(list(status = original$estimate_status, reason = original$error,
+        requested = B, valid = 0L, failed = if (non_identifiable) 0L else B,
+        non_identifiable = if (non_identifiable) B else 0L,
+        valid_rate = 0, percentile = c(lower = NA_real_, upper = NA_real_),
+        basic = c(lower = NA_real_, upper = NA_real_)))
+    }
+    estimate <- original$estimates$mean
+  }
+  bootstrap_ros_mean(observed, estimate, B = B, conf.level = conf.level)
 }
