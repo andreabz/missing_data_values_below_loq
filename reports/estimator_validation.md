@@ -55,53 +55,67 @@ Deterministic cases include no, partial, elevated (75%), and total censoring. In
 
 Successful: 250/250; failures: 0; non-identifiable: 0
 
-| Statistic | Reference | Bias | RMSE | Empirical SD |
+Reconstruction error against the same replicate's latent sample:
+
+| Statistic | Reference | Reconstruction-error bias | Reconstruction-error RMSE | SD of reconstruction errors |
 |---|---|---:|---:|---:|
-| mean vs same-replicate latent sample | 0 | -0.00042604 | 0.0044556 | 0.0044441 |
-| mean vs population parameter | 1.6487 | -0.010823 | 0.2504 | 0.25066 |
-| median vs same-replicate latent sample | 0 | 0 | 0 | 0 |
-| median vs population parameter | 1 | -0.0058174 | 0.15594 | 0.15614 |
-| sd vs same-replicate latent sample | 0 | 6.9352e-05 | 0.0035583 | 0.0035647 |
-| sd vs population parameter | 2.1612 | -0.16685 | 0.73466 | 0.7169 |
-| cv vs same-replicate latent sample | 0 | 0.00052375 | 0.0056464 | 0.0056333 |
-| cv vs population parameter | 1.3108 | -0.11211 | 0.32503 | 0.3057 |
+| mean | Same-replicate latent-sample statistic | -0.00042604 | 0.0044556 | 0.0044441 |
+| median | Same-replicate latent-sample statistic | 0 | 0 | 0 |
+| sd | Same-replicate latent-sample statistic | 6.9352e-05 | 0.0035583 | 0.0035647 |
+| cv | Same-replicate latent-sample statistic | 0.00052375 | 0.0056464 | 0.0056333 |
+
+Estimation error against the population parameter:
+
+| Statistic | Population parameter | Estimation bias | Estimation RMSE | Empirical SD of ROS estimates |
+|---|---:|---:|---:|---:|
+| mean | 1.6487 | -0.010823 | 0.2504 | 0.25066 |
+| median | 1 | -0.0058174 | 0.15594 | 0.15614 |
+| sd | 2.1612 | -0.16685 | 0.73466 | 0.7169 |
+| cv | 1.3108 | -0.11211 | 0.32503 | 0.3057 |
 
 ### censor_0.4 (F(LOQ)=0.4)
 
 Successful: 250/250; failures: 0; non-identifiable: 0
 
-| Statistic | Reference | Bias | RMSE | Empirical SD |
+Reconstruction error against the same replicate's latent sample:
+
+| Statistic | Reference | Reconstruction-error bias | Reconstruction-error RMSE | SD of reconstruction errors |
 |---|---|---:|---:|---:|
-| mean vs same-replicate latent sample | 0 | -0.0055404 | 0.029683 | 0.02922 |
-| mean vs population parameter | 1.6487 | 0.021141 | 0.30349 | 0.30336 |
-| median vs same-replicate latent sample | 0 | 0.0017164 | 0.021633 | 0.021608 |
-| median vs population parameter | 1 | 0.029405 | 0.16646 | 0.16418 |
-| sd vs same-replicate latent sample | 0 | 0.0017127 | 0.019017 | 0.018977 |
-| sd vs population parameter | 2.1612 | -0.16682 | 0.80171 | 0.78574 |
-| cv vs same-replicate latent sample | 0 | 0.0066313 | 0.034012 | 0.033426 |
-| cv vs population parameter | 1.3108 | -0.13957 | 0.3096 | 0.27691 |
+| mean | Same-replicate latent-sample statistic | -0.0055404 | 0.029683 | 0.02922 |
+| median | Same-replicate latent-sample statistic | 0.0017164 | 0.021633 | 0.021608 |
+| sd | Same-replicate latent-sample statistic | 0.0017127 | 0.019017 | 0.018977 |
+| cv | Same-replicate latent-sample statistic | 0.0066313 | 0.034012 | 0.033426 |
+
+Estimation error against the population parameter:
+
+| Statistic | Population parameter | Estimation bias | Estimation RMSE | Empirical SD of ROS estimates |
+|---|---:|---:|---:|---:|
+| mean | 1.6487 | 0.021141 | 0.30349 | 0.30336 |
+| median | 1 | 0.029405 | 0.16646 | 0.16418 |
+| sd | 2.1612 | -0.16682 | 0.80171 | 0.78574 |
+| cv | 1.3108 | -0.13957 | 0.3096 | 0.27691 |
 
 ## Reverse KM quantiles
 
-For each common LOQ, probabilities p <= F(LOQ) are listed as structurally non-identifiable and are not scored. For p > F(LOQ), quantiles are scored only when NADA returns finite values; the finite-return rate captures numerical/tail limitations separately.
+For each common LOQ, probabilities p <= F(LOQ) are theoretically non-identifiable and are not scored. For p > F(LOQ), finite-return rates use all simulation replicates. Bias, RMSE, and empirical SD are conditional on NADA returning a finite quantile estimate and are calculated only among those finite estimates. This separates structural non-identifiability, non-finite return at an otherwise identifiable probability, and estimation error among finite returns.
 
 ### censor_0.1 (F(LOQ)=0.1)
 
 Theoretically non-identifiable: q0.1; failed fits: 0
 
-- q0.25 finite return rate: 1; bias/RMSE/empirical SD: -0.0054921/0.084161/0.08415
-- q0.4 finite return rate: 1; bias/RMSE/empirical SD: -0.0098929/0.12235/0.12219
-- q0.5 finite return rate: 1; bias/RMSE/empirical SD: -0.018559/0.16231/0.16157
-- q0.75 finite return rate: 1; bias/RMSE/empirical SD: -0.025117/0.3358/0.33553
-- q0.9 finite return rate: 1; bias/RMSE/empirical SD: -0.14012/0.72888/0.71672
+- q0.25 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: -0.0054921/0.084161/0.08415
+- q0.4 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: -0.0098929/0.12235/0.12219
+- q0.5 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: -0.018559/0.16231/0.16157
+- q0.75 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: -0.025117/0.3358/0.33553
+- q0.9 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: -0.14012/0.72888/0.71672
 
 ### censor_0.4 (F(LOQ)=0.4)
 
 Theoretically non-identifiable: q0.1, q0.25, q0.4; failed fits: 0
 
-- q0.5 finite return rate: 0.928; bias/RMSE/empirical SD: 0.024397/0.13838/0.1365
-- q0.75 finite return rate: 1; bias/RMSE/empirical SD: 0.0081797/0.34364/0.34423
-- q0.9 finite return rate: 1; bias/RMSE/empirical SD: -0.082781/0.75845/0.75544
+- q0.5 (p > F(LOQ)): finite-return rate across all 250 replicates = 0.928; conditional-on-finite-return bias/RMSE/empirical SD: 0.024397/0.13838/0.1365
+- q0.75 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: 0.0081797/0.34364/0.34423
+- q0.9 (p > F(LOQ)): finite-return rate across all 250 replicates = 1; conditional-on-finite-return bias/RMSE/empirical SD: -0.082781/0.75845/0.75544
 
 ## Decisions and limitations
 
