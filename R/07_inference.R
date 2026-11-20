@@ -170,8 +170,10 @@ infer_ros_mean <- function(method_result, observed, conf.level, bootstrap_replic
   result$inference$estimand <- "Arithmetic mean of the ROS-reconstructed distribution, used as an estimate of the population mean"
   result$inference$bootstrap_percentile <- boot$percentile
   result$inference$bootstrap_basic <- boot$basic
-  result$inference$ucl95_percentile <- boot$ucl_percentile
-  result$inference$ucl95_basic <- boot$ucl_basic
+  result$inference$ucl_percentile <- boot$ucl_percentile
+  result$inference$ucl_basic <- boot$ucl_basic
+  result$inference$ucl95_percentile <- if (conf.level == 0.95) boot$ucl_percentile else NA_real_
+  result$inference$ucl95_basic <- if (conf.level == 0.95) boot$ucl_basic else NA_real_
   result$inference$ci_mean_level <- list(level = conf.level, interval = boot$percentile)
   result$inference$ci_mean_95 <- if (conf.level == 0.95) boot$percentile else
     c(lower = NA_real_, upper = NA_real_)
@@ -204,11 +206,12 @@ bootstrap_ros_mean <- function(observed, estimate, B = 999L, conf.level = 0.95) 
   valid_values <- values[is.finite(values)]
   valid <- length(valid_values)
   alpha <- (1 - conf.level) / 2
-  q <- if (valid >= 2L) stats::quantile(valid_values, c(alpha, 1 - alpha, 1 - conf.level),
-    names = FALSE, type = 6) else rep(NA_real_, 3L)
+  q <- if (valid >= 2L) stats::quantile(valid_values,
+    c(alpha, 1 - alpha, 1 - conf.level, conf.level),
+    names = FALSE, type = 6) else rep(NA_real_, 4L)
   percentile <- c(lower = q[1L], upper = q[2L])
   basic <- c(lower = 2 * estimate - q[2L], upper = 2 * estimate - q[1L])
-  list(percentile = percentile, basic = basic, ucl_percentile = q[3L],
+  list(percentile = percentile, basic = basic, ucl_percentile = q[4L],
     ucl_basic = 2 * estimate - q[3L], requested = B, valid = valid,
     failed = sum(!is.finite(values) & reasons != "non_identifiable"),
     non_identifiable = sum(reasons == "non_identifiable"), valid_rate = valid / B,
@@ -236,6 +239,7 @@ infer_reverse_km_quantiles <- function(method_result, observed,
   result$inference$mean_status <- "non_identifiable"
   result$inference$ci_mean_95 <- c(lower = NA_real_, upper = NA_real_)
   result$inference$quantile_intervals <- vector("list", length(probs))
+  result$inference$quantile_confidence_level <- conf.level
   names(result$inference$quantile_intervals) <- paste0("q", probs)
   p_cen <- mean(observed$censored)
   fit_for_band <- fit
