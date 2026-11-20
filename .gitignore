@@ -1,0 +1,11 @@
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+*_files/
+_freeze/
+results/*
+!results/.gitkeep
+*.tmp
+*.log
+.DS_Store
