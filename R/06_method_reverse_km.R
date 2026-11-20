@@ -4,7 +4,9 @@ apply_reverse_km_method <- function(observed, replicate_id = NA_integer_,
                                     probs = c(0.025, 0.10, 0.50, 0.90, 0.975)) {
   ensure_censoring_packages_attached()
   validate_observed_data(observed)
-  if (any(!is.finite(probs)) || any(probs < 0 | probs > 1)) stop("probs must be in [0, 1]")
+  if (!is.numeric(probs) || !length(probs) || any(!is.finite(probs)) ||
+      any(probs < 0 | probs > 1) || anyDuplicated(probs))
+    stop("probs must be a non-empty numeric vector of unique finite values in [0, 1]")
   captured <- capture_conditions(NADA::cenfit(observed$value, observed$censored))
   fit <- captured$value
   if (inherits(fit, "method_error"))
