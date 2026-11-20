@@ -49,13 +49,21 @@ stopifnot(bad_inf$inference$status == "failed")
 # Each ROS resample passes through apply_ros_method; failures and non-identifiability
 # are retained, while reconstructed values are never resampled as raw observations.
 ros <- apply_ros_method(observed)
-ros_boot <- bootstrap_ros_mean(observed, ros$estimates$mean, B = 31L, conf.level = 0.90)
+ros_boot <- bootstrap_ros(observed, B = 31L, conf.level = 0.90)
 stopifnot(ros_boot$requested == 31L)
 stopifnot(ros_boot$valid + ros_boot$failed + ros_boot$non_identifiable == 31L)
 stopifnot(all(c("lower", "upper") %in% names(ros_boot$percentile)))
 stopifnot(all(c("lower", "upper") %in% names(ros_boot$basic)))
 stopifnot(is.finite(ros_boot$ucl_percentile) || ros_boot$valid < 2L)
 stopifnot(is.finite(ros_boot$ucl_basic) || ros_boot$valid < 2L)
+if (ros_boot$valid >= 2L) {
+  alpha <- 0.10
+  stopifnot(isTRUE(all.equal(unname(ros_boot$ucl_percentile),
+    unname(stats::quantile(ros_boot$distribution, 0.90, names = FALSE, type = 6)), tolerance = 1e-12)))
+  stopifnot(isTRUE(all.equal(unname(ros_boot$ucl_basic),
+    unname(2 * ros$estimates$mean - stats::quantile(ros_boot$distribution, alpha,
+      names = FALSE, type = 6)), tolerance = 1e-12)))
+}
 
 all_censored <- data.frame(value = rep(100, 20), censored = rep(TRUE, 20), loq = rep(100, 20))
 ros_nonid <- bootstrap_ros_mean(all_censored, 1, B = 11L)
