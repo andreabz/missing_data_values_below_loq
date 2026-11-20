@@ -2,8 +2,9 @@
 
 evaluate_replication <- function(replication, truth, population_parameters = NULL) {
   if (!inherits(replication, "single_replication_result")) stop("replication has invalid class")
-  if (!is.numeric(truth) || length(truth) != nrow(replication$observed))
-    stop("truth must be numeric and match the observed sample length")
+  if (!is.numeric(truth) || length(truth) != nrow(replication$observed) ||
+      any(!is.finite(truth)))
+    stop("truth must be a finite numeric vector matching the observed sample length")
   truth_stats <- list(mean = safe_stat(mean(truth)), median = safe_stat(stats::median(truth)),
     sd = safe_stat(stats::sd(truth)), cv = safe_stat(stats::sd(truth) / mean(truth)))
   if (is.null(population_parameters)) population_parameters <- list()
@@ -36,6 +37,12 @@ safe_stat <- function(x) if (length(x) == 1L && is.finite(x)) x else NA_real_
 collect_replication_results <- function(replications) {
   if (!is.list(replications) || !length(replications) || any(!vapply(replications, inherits, logical(1),
       what = "single_replication_result"))) stop("All inputs must be single_replication_result objects")
+  replicate_ids <- lapply(replications, function(x) x$replicate_id)
+  valid_ids <- vapply(replicate_ids, function(x) length(x) == 1L && !is.na(x) &&
+    (is.character(x) || is.numeric(x)), logical(1))
+  if (!all(valid_ids)) stop("Each replication must have one non-missing character or numeric replicate_id")
+  id_labels <- vapply(replicate_ids, as.character, character(1))
+  if (anyDuplicated(id_labels)) stop("replicate_id values must be unique")
   rows <- lapply(replications, function(replication) {
     lapply(replication$methods, function(result) {
       result$replicate_id <- replication$replicate_id
