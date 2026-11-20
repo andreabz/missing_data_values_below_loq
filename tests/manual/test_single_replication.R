@@ -139,3 +139,61 @@ stopifnot(!"truth" %in% names(single))
 
 cat("Single replication functional checks passed.\n")
 print(checks)
+
+
+# Input-contract edge cases introduced in the review.
+stopifnot(inherits(try(apply_reverse_km_method(reverse_sample$observed, probs = numeric()),
+  silent = TRUE), "try-error"))
+stopifnot(inherits(try(apply_reverse_km_method(reverse_sample$observed, probs = "0.5"),
+  silent = TRUE), "try-error"))
+stopifnot(inherits(try(apply_reverse_km_method(reverse_sample$observed, probs = c(0.5, 0.5)),
+  silent = TRUE), "try-error"))
+stopifnot(inherits(try(evaluate_replication(eval_rep, replace(eval_sample$truth, 1, Inf)),
+  silent = TRUE), "try-error"))
+duplicate_id_error <- try(collect_replication_results(list(rep_a, rep_a)), silent = TRUE)
+stopifnot(inherits(duplicate_id_error, "try-error"))
+
+# Deterministic API cross-checks: wrappers must reproduce the corresponding
+# installed NADA/NADA2 point estimates for the same fixed observed sample.
+n_check <- 40L
+truth_check <- stats::qlnorm((seq_len(n_check) - 0.5) / n_check, meanlog = 0, sdlog = 1)
+loq_check <- stats::qlnorm(0.25, meanlog = 0, sdlog = 1)
+censored_check <- truth_check < loq_check
+observed_check <- data.frame(
+  value = ifelse(censored_check, loq_check, truth_check),
+  censored = censored_check, loq = rep(loq_check, n_check)
+)
+ros_direct <- NADA2::ros(observed_check$value, observed_check$censored,
+  forwardT = "log", reverseT = "exp")
+ros_wrapped <- apply_ros_method(observed_check)
+stopifnot(ros_wrapped$estimate_status == "success")
+stopifnot(isTRUE(all.equal(ros_wrapped$estimates$mean, mean(ros_direct$modeled),
+  tolerance = 1e-10)))
+stopifnot(isTRUE(all.equal(ros_wrapped$estimates$median, stats::median(ros_direct$modeled),
+  tolerance = 1e-10)))
+
+mle_direct <- NADA::cenmle(observed_check$value, observed_check$censored,
+  dist = "lognormal", conf.int = 0.95)
+mle_direct_moments <- lognormal_moments(unname(stats::coef(mle_direct@survreg)[1L]),
+  unname(mle_direct@survreg$scale))
+mle_wrapped <- apply_mle_method(observed_check)
+stopifnot(mle_wrapped$estimate_status == "success")
+stopifnot(isTRUE(all.equal(mle_wrapped$estimates$mean, mle_direct_moments$mean,
+  tolerance = 1e-10)))
+stopifnot(isTRUE(all.equal(mle_wrapped$estimates$sd, mle_direct_moments$sd,
+  tolerance = 1e-10)))
+
+# Reverse-KM behavior across several fixed censoring thresholds.
+for (censor_probability in c(0, 0.10, 0.25, 0.40, 0.75)) {
+  threshold <- stats::qlnorm(censor_probability, meanlog = 0, sdlog = 1)
+  censored_level <- truth_check < threshold
+  if (censor_probability == 0) censored_level[] <- FALSE
+  level_data <- data.frame(
+    value = ifelse(censored_level, threshold, truth_check),
+    censored = censored_level, loq = rep(threshold, n_check)
+  )
+  level_result <- apply_reverse_km_method(level_data)
+  stopifnot(length(level_result$estimates$quantiles) == 5L)
+  stopifnot(all(is.na(level_result$estimates$quantiles[
+    c(0.025, 0.10, 0.50, 0.90, 0.975) <= mean(censored_level)])))
+}
