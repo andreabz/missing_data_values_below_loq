@@ -7,8 +7,11 @@ make_sample <- function(censored, detected, loq = 0.5) {
   n <- length(censored)
   values <- rep(loq, n)
   values[!censored] <- detected
+  truth <- values
+  n_censored <- sum(censored)
+  if (n_censored) truth[censored] <- loq * seq(0.1, 0.9, length.out = n_censored)
   list(observed = data.frame(id = seq_len(n), value = values,
-    censored = censored, loq = rep(loq, n)), truth = seq_len(n) / n,
+    censored = censored, loq = rep(loq, n)), truth = truth,
     metadata = list(n = n, loq = loq, n_censored = sum(censored)))
 }
 
@@ -18,9 +21,35 @@ scenarios <- list(
                         seq(0.7, 2.1, length.out = 6)),
   elevated = make_sample(c(rep(TRUE, 6), FALSE, FALSE), c(1.1, 1.8)),
   all = make_sample(rep(TRUE, 8), numeric()),
-  no_positive_detects = make_sample(c(TRUE, TRUE, FALSE, FALSE), c(0, 0)),
   nonfinite = make_sample(c(FALSE, FALSE, FALSE), c(1, Inf, 2))
 )
+
+robustness_cases <- list(
+  nonpositive_loq = make_sample(rep(FALSE, 3), c(0.5, 1, 1.5), loq = 0),
+  malformed_censored_value = make_sample(c(TRUE, FALSE), 1),
+  malformed_detected_value = make_sample(c(FALSE, FALSE), c(0.5, 1))
+)
+robustness_cases$malformed_censored_value$observed$value[1] <- 0.4
+
+expected_observed <- data.frame(value = c(0.5, 0.5, 0.8, 1.2, 1.6),
+  censored = c(TRUE, TRUE, FALSE, FALSE, FALSE), loq = rep(0.5, 5))
+expected_stats <- list(
+  complete_case = c(mean = 1.2, median = 1.2, sd = 0.4),
+  substitute_zero = c(mean = 0.72, median = 0.8, sd = sqrt(0.512)),
+  substitute_loq_half = c(mean = 0.82, median = 0.8, sd = sqrt(0.35075)),
+  substitute_loq = c(mean = 0.92, median = 0.8, sd = sqrt(0.227))
+)
+for (method in names(expected_stats)) {
+  result <- apply_simple_method(expected_observed, method, replicate_id = 7L)
+  stopifnot(isTRUE(all.equal(unlist(result$estimates[c("mean", "median", "sd")]),
+    expected_stats[[method]], tolerance = 1e-12)))
+}
+known_lognormal <- lognormal_moments(0, 1)
+stopifnot(isTRUE(all.equal(unlist(known_lognormal),
+  c(mean = exp(0.5), median = 1, sd = sqrt((exp(1) - 1) * exp(1)),
+    cv = sqrt(exp(1) - 1)), tolerance = 1e-12)))
+validate_observed_data(expected_observed)
+validate_observed_data(robustness_cases$nonpositive_loq$observed)
 
 checks <- list()
 for (nm in names(scenarios)) {
@@ -35,19 +64,63 @@ for (nm in names(scenarios)) {
     "substitute_loq_half", "substitute_loq", "ros_log", "mle_lognormal", "reverse_km")))
   stopifnot(all(vapply(r$methods, function(z) z$n == nrow(s$observed), logical(1))))
   stopifnot(all(vapply(r$methods, function(z) z$n_censored == sum(s$observed$censored), logical(1))))
+  stopifnot(all(s$observed$value[s$observed$censored] == s$observed$loq[s$observed$censored]))
+  stopifnot(all(s$truth[s$observed$censored] < s$observed$loq[s$observed$censored]))
+  stopifnot(all(s$truth[!s$observed$censored] == s$observed$value[!s$observed$censored]))
   stopifnot(!any(vapply(r$methods, function(z) "truth" %in% names(z), logical(1))))
   if (nm == "all") {
     stopifnot(r$methods$mle_lognormal$estimate_status == "non_identifiable")
     stopifnot(r$methods$ros_log$estimate_status == "non_identifiable")
   }
-  if (nm == "no_positive_detects") {
-    stopifnot(r$methods$mle_lognormal$estimate_status == "not_applicable")
-    stopifnot(r$methods$ros_log$estimate_status == "not_applicable")
-  }
   ev <- evaluate_replication(r, s$truth)
   stopifnot(is.finite(ev$sample_truth$mean))
   checks[[nm]] <- vapply(r$methods, `[[`, character(1), "estimate_status")
 }
+
+for (nm in names(robustness_cases)) {
+  sample <- robustness_cases[[nm]]
+  if (nm == "nonpositive_loq") {
+    z <- run_single_replication(sample)
+    stopifnot(z$methods$mle_lognormal$estimate_status == "not_applicable")
+    stopifnot(z$methods$ros_log$estimate_status == "not_applicable")
+  } else {
+    stopifnot(inherits(try(validate_observed_data(sample$observed), silent = TRUE), "try-error"))
+  }
+}
+
+# NADA returns only actually estimable reverse-KM quantiles. For this sample
+# q(.5) is finite while q(.025) is below the censoring fraction and q(.975) is
+# beyond the finite tail of the fitted reverse-KM curve.
+reverse_sample <- make_sample(c(rep(TRUE, 16), rep(FALSE, 24)),
+  exp(seq(log(0.8), log(9), length.out = 24)))
+reverse_result <- apply_reverse_km_method(as.data.frame(reverse_sample$observed))
+stopifnot(is.finite(reverse_result$estimates$quantiles[["q0.5"]]))
+stopifnot(is.na(reverse_result$estimates$quantiles[["q0.025"]]))
+stopifnot(is.na(reverse_result$estimates$quantiles[["q0.975"]]))
+stopifnot(is.finite(reverse_result$estimates$median))
+median_not_requested <- apply_reverse_km_method(as.data.frame(reverse_sample$observed), probs = 0.6)
+stopifnot(is.na(median_not_requested$estimates$median))
+
+base_sample <- scenarios$partial
+rep_a <- run_single_replication(base_sample, replicate_id = 41L, methods = "substitute_loq_half")
+rep_b <- run_single_replication(base_sample, replicate_id = 42L, methods = "substitute_loq")
+collected <- collect_replication_results(list(rep_a, rep_b))
+stopifnot(inherits(collected, "replication_result_collection"))
+stopifnot(identical(names(collected), c("41", "42")))
+stopifnot(identical(collected[[1]]$substitute_loq_half$replicate_id, 41L))
+stopifnot(identical(collected[[1]]$substitute_loq_half$method, "substitute_loq_half"))
+stopifnot(identical(collected[[2]]$substitute_loq$replicate_id, 42L))
+
+eval_sample <- make_sample(c(TRUE, TRUE, FALSE, FALSE), c(1, 1.5))
+eval_rep <- run_single_replication(eval_sample, replicate_id = 55L, methods = "substitute_loq")
+evaluation <- evaluate_replication(eval_rep, eval_sample$truth,
+  population_parameters = list(mean = 1.2, median = 1, sd = 0.5, cv = 0.4))
+row <- evaluation$methods[[1]]
+stopifnot(is.finite(row$errors_vs_sample_truth$mean))
+stopifnot(isTRUE(all.equal(row$errors_vs_population_parameters$mean,
+  row$estimates$mean - 1.2)))
+missing_reference <- evaluate_replication(eval_rep, eval_sample$truth)
+stopifnot(is.na(missing_reference$methods[[1]]$errors_vs_population_parameters$mean))
 
 # The public wrapper identifies the all-censored case before fitting. Confirm
 # separately that the installed backend itself warns/fails to converge there.

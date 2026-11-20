@@ -11,24 +11,36 @@ apply_reverse_km_method <- function(observed, replicate_id = NA_integer_,
     return(new_method_result(replicate_id, "reverse_km", observed, "failed",
       warnings = captured$warnings, error = fit$message))
 
-  # A common left-censoring threshold leaves quantiles below the censored
-  # proportion unidentified. Keep them NA instead of using package moments.
+  # NADA's reverse-KM quantile method can return NA even above the censoring
+  # fraction (for example, beyond the estimable tail). Query each requested
+  # probability separately and retain only values actually returned finite.
   p_cen <- mean(observed$censored)
-  identifiable <- probs > p_cen
   q <- rep(NA_real_, length(probs)); names(q) <- paste0("q", probs)
   quantile_warnings <- character()
-  if (any(identifiable)) {
-    qresult <- capture_conditions(quantile(fit, probs = probs[identifiable]))
-    quantile_warnings <- qresult$warnings
-    qfit <- qresult$value
-    if (!inherits(qfit, "method_error")) q[identifiable] <- as.numeric(qfit)
+  quantile_errors <- character()
+  for (i in seq_along(probs)) {
+    if (probs[i] <= p_cen) next
+    qresult <- capture_conditions(quantile(fit, probs = probs[i]))
+    quantile_warnings <- c(quantile_warnings, qresult$warnings)
+    if (inherits(qresult$value, "method_error")) {
+      quantile_errors <- c(quantile_errors, qresult$value$message)
+      next
+    }
+    value <- suppressWarnings(as.numeric(qresult$value)[1L])
+    if (length(value) == 1L && is.finite(value)) q[i] <- value
   }
-  estimates <- list(quantiles = q, mean = NA_real_, median = if (0.5 > p_cen) unname(q[which.min(abs(probs - 0.5))]) else NA_real_,
+  identifiable <- is.finite(q) & probs > p_cen
+  median_index <- which(probs == 0.5)
+  median_value <- if (length(median_index) == 1L && identifiable[median_index]) q[median_index] else NA_real_
+  estimates <- list(quantiles = q, mean = NA_real_, median = median_value,
                     sd = NA_real_, cv = NA_real_)
-  status <- if (!any(identifiable)) "non_identifiable" else if (all(identifiable)) "success" else "partial"
+  status <- if (length(quantile_errors) && !any(identifiable)) "failed" else
+    if (all(identifiable)) "success" else if (any(identifiable)) "partial" else "non_identifiable"
   new_method_result(replicate_id, "reverse_km", observed, status,
     inference_status = "not_implemented", warnings = unique(c(captured$warnings, quantile_warnings)),
+    error = if (length(quantile_errors)) paste(unique(quantile_errors), collapse = " | ") else NA_character_,
     estimates = estimates,
     details = list(fit = fit, identifiable_quantiles = setNames(identifiable, names(q)),
-      non_identifiable_reason = "Quantiles at or below the common censoring proportion are not identified."))
+      non_identifiable_reason = "Quantiles at or below the common censoring proportion, and quantiles NADA does not return finitely, are unavailable.",
+      quantile_errors = unique(quantile_errors)))
 }

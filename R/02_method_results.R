@@ -23,7 +23,6 @@ new_method_result <- function(
     error = error, details = details
   )
 }
-
 capture_conditions <- function(expr) {
   warnings <- character()
   value <- tryCatch(
@@ -51,7 +50,13 @@ validate_observed_data <- function(observed) {
   if (!is.numeric(observed$value) || !is.logical(observed$censored) ||
       !is.numeric(observed$loq) || anyNA(observed$censored) ||
       any(!is.finite(observed$value)) || any(!is.finite(observed$loq)) ||
-      length(unique(observed$loq)) != 1L || nrow(observed) < 1L)
+      length(unique(observed$loq)) != 1L || nrow(observed) < 1L ||
+      length(observed$value) != nrow(observed) || length(observed$censored) != nrow(observed) ||
+      length(observed$loq) != nrow(observed))
     stop("observed data have invalid values, indicators, or non-common LOQ")
+  if (any(observed$value[observed$censored] != observed$loq[observed$censored]))
+    stop("censored observations must be recorded at their LOQ")
+  if (any(observed$value[!observed$censored] <= observed$loq[!observed$censored]))
+    stop("uncensored observations must be strictly greater than their LOQ")
   invisible(TRUE)
 }

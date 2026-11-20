@@ -1,8 +1,21 @@
 # Left-censored lognormal maximum likelihood ---------------------------------
 
+lognormal_moments <- function(meanlog, sdlog) {
+  if (length(meanlog) != 1L || !is.finite(meanlog) || length(sdlog) != 1L ||
+      !is.finite(sdlog) || sdlog <= 0) stop("meanlog must be finite and sdlog must be finite and positive")
+  mean <- exp(meanlog + sdlog^2 / 2)
+  median <- exp(meanlog)
+  sd <- sqrt((exp(sdlog^2) - 1) * exp(2 * meanlog + sdlog^2))
+  cv <- sqrt(exp(sdlog^2) - 1)
+  list(mean = mean, median = median, sd = sd, cv = cv)
+}
+
 apply_mle_method <- function(observed, replicate_id = NA_integer_) {
   ensure_censoring_packages_attached()
   validate_observed_data(observed)
+  if (any(observed$loq <= 0) || any(observed$value[!observed$censored] <= 0))
+    return(new_method_result(replicate_id, "mle_lognormal", observed, "not_applicable",
+      error = "Lognormal MLE requires a positive LOQ and positive detected observations."))
   detected <- observed$value[!observed$censored]
   if (length(detected) < 2L || length(unique(detected)) < 2L) {
     msg <- if (!length(detected)) "All observations are censored; lognormal parameters are not identifiable." else
@@ -27,13 +40,15 @@ apply_mle_method <- function(observed, replicate_id = NA_integer_) {
   sr <- fit@survreg
   mu <- unname(stats::coef(sr)[1L])
   sigma <- unname(sr$scale)
-  converged <- is.null(sr$fail) || identical(sr$fail, 0L)
-  finite <- length(mu) == 1L && is.finite(mu) && length(sigma) == 1L && is.finite(sigma) && sigma > 0
-  status <- if (!converged) "non_converged" else if (!finite) "partial" else "success"
-  estimates <- if (finite) list(mean = exp(mu + sigma^2 / 2), median = exp(mu),
-      sd = sqrt((exp(sigma^2) - 1) * exp(2 * mu + sigma^2)),
-      cv = sqrt(exp(sigma^2) - 1)) else
-    list(mean = NA_real_, median = NA_real_, sd = NA_real_, cv = NA_real_)
+  fail <- sr$fail
+  converged <- is.null(fail) || (length(fail) == 1L && is.numeric(fail) && is.finite(fail) && fail == 0)
+  if (any(grepl("did not converge|ran out of iterations", captured$warnings, ignore.case = TRUE)))
+    converged <- FALSE
+  finite_params <- length(mu) == 1L && is.finite(mu) && length(sigma) == 1L && is.finite(sigma) && sigma > 0
+  estimates <- if (finite_params) tryCatch(lognormal_moments(mu, sigma), error = function(e) NULL) else NULL
+  finite_estimates <- !is.null(estimates) && all(is.finite(unlist(estimates)))
+  status <- if (!converged) "non_converged" else if (!finite_params || !finite_estimates) "failed" else "success"
+  if (!finite_estimates) estimates <- list(mean = NA_real_, median = NA_real_, sd = NA_real_, cv = NA_real_)
   vc <- tryCatch(stats::vcov(sr), error = function(e) NULL)
   se <- if (!is.null(vc)) sqrt(diag(vc)) else numeric()
   parameters <- list(meanlog = mu, sdlog = sigma,
