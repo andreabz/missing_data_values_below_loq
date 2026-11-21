@@ -112,3 +112,13 @@ Package documentation: [NADA](https://cran.r-project.org/package=NADA), [NADA2](
 - Confidence interval and UCL construction for ROS, MLE and reverse KM.
 - Bootstrap design and computational settings.
 - Treatment of samples with no detected observations or no censored observations.
+
+## Current implementation and validation status
+
+The repository implements the seven methods listed above and a primary-run driver in `R/12_primary_monte_carlo.R`. The driver sends one generated sample to all selected methods, stores latent sample values only for evaluation, derives replicate seeds from an explicit master seed, and supports atomic per-scenario checkpoints and signature-checked resume. Its default replicate count remains the configured 2,000 per condition. A small functional smoke check verifies interruption, resume, and reproducibility; it is not evidence of estimator accuracy or inferential validity.
+
+Estimator and inference evidence is summarized in `reports/estimator_validation.md`, `reports/inference_validation.md`, and `reports/inference_bootstrap_stability.md`. The estimator diagnostics have stated reservations and do not validate intervals. Inference decisions remain specific to method, estimand, interval type, and condition; `not validated` and `inconclusive` are distinct outcomes. The targeted B=99 versus B=499 stability supplement shows material endpoint changes, so the bootstrap procedures remain preliminary. The configured `n_bootstrap_pilot = 2000` is not a final bootstrap recommendation.
+
+For reverse KM under the common LOQ, the mean is recorded as structurally non-identifiable and only quantiles returned by the fitted curve are considered; structural non-identifiability, sample non-estimability, and a missing returned quantile are kept separate. The primary runner therefore currently rejects `inference = TRUE`: the existing replication interface activates MLE and ROS bootstrap together. After scientific review, add method- and procedure-specific inference selection (including MLE log-Wald without bootstrap) before enabling inferential outcomes in the primary run.
+
+The definitive lognormal Monte Carlo has not been launched. The 2,000-replicate design and the planned 5,000/10,000 Monte Carlo precision review remain as specified above; seed approval and the decision to extend replicate counts are open. No Gamma misspecification scenario or bootstrap stability run is authorized by this protocol update. Shared scientific review is required before the primary run begins.
