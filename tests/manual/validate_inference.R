@@ -1,12 +1,26 @@
 # Deterministic checks for method-specific inferential procedures.
 for (file in c("R/02_method_results.R", "R/04_method_ros.R", "R/05_method_mle.R",
-               "R/06_method_reverse_km.R", "R/07_inference.R", "R/08_single_replication.R"))
+               "R/06_method_reverse_km.R", "R/07_inference.R", "R/08_single_replication.R",
+               "R/11_inference_validation_decisions.R"))
   source(file)
 ensure_censoring_packages_attached()
 
 stopifnot(inherits(try(validate_confidence_level(1), silent = TRUE), "try-error"))
 stopifnot(inherits(try(validate_bootstrap_replicates(1), silent = TRUE), "try-error"))
 stopifnot(identical(validate_bootstrap_replicates(20), 20L))
+
+# Exact coverage decisions separate significant undercoverage, equivalence,
+# inconclusive precision, and interval availability.
+undercovered <- classify_inference_coverage(430, 500, availability = 1)
+stopifnot(undercovered$status == "not validated", undercovered$undercoverage_p < 0.05)
+well_calibrated <- classify_inference_coverage(475, 500, availability = 1)
+stopifnot(well_calibrated$status == "validated")
+imprecise <- classify_inference_coverage(9, 10, availability = 1)
+stopifnot(imprecise$status == "inconclusive")
+unavailable <- classify_inference_coverage(475, 500, availability = 0.90)
+stopifnot(unavailable$status == "inconclusive")
+structural <- classify_inference_coverage(NA_real_, 0, availability = NA_real_)
+stopifnot(structural$status == "inconclusive")
 
 set.seed(731)
 n <- 80L
