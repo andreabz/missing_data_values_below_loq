@@ -17,7 +17,6 @@ loq_values <- stats::qlnorm(
 )
 
 n_monte_carlo <- 2000L
-n_bootstrap_pilot <- 2000L
 
 population_parameters <- list(
   mean = exp(mu + sigma^2 / 2),
@@ -34,7 +33,6 @@ simulation_config <- list(
   loq_probabilities = loq_probabilities,
   loq_values = loq_values,
   n_monte_carlo = n_monte_carlo,
-  n_bootstrap_pilot = n_bootstrap_pilot,
   population_parameters = population_parameters
 )
 
