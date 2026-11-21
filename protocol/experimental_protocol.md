@@ -2,7 +2,7 @@
 
 ## Objective
 
-Evaluate by Monte Carlo simulation how alternative treatments of left-censored concentration measurements affect descriptive statistics and inference. A censored observation provides the information that its latent value is below the applicable LOQ; it is not an ordinary missing value.
+The first Monte Carlo evaluates point estimators for left-censored concentration measurements. A censored observation provides the information that its latent value is below the applicable LOQ; it is not an ordinary missing value. Inferential validation remains documented in the existing reports but is excluded from this primary run.
 
 ## Initial data-generating model
 
@@ -29,9 +29,12 @@ The theoretical censoring probabilities are 0.10 and 0.40. LOQs remain fixed acr
 - Sample sizes: n = 30, 100, 500.
 - LOQ conditions: 10th and 40th percentiles.
 - Initial replicates: 2,000 per sample-size/LOQ combination.
+- Approved master seed: 20261122.
+- Total: six conditions and 12,000 generated samples.
 - Use the same generated sample for all applicable methods to enable paired comparisons.
+- For each replicate, generate the full latent sample, calculate its statistics, then apply the fixed scenario LOQ and run the methods. Compare each estimate with both the complete-sample statistic (paired sample truth) and the population parameter, stored as distinct references.
 
-The initial lognormal experiment contains 12,000 generated samples. Review Monte Carlo stability at 2,000, 5,000 and 10,000 replicates.
+The first experiment is fixed at 2,000 replicates per condition. Do not extend it to 5,000 or 10,000 replicates.
 
 ## Methods retained
 
@@ -68,17 +71,13 @@ NADA, NADA2 and EnvStats will be inspected at function and source/documentation 
 ### Estimation performance
 For each estimable parameter: bias, relative bias, empirical standard deviation of estimates and RMSE.
 
-### Inference
-- Two-sided 95% confidence interval for the mean.
-- Interval width and empirical coverage.
-- One-sided 95% upper confidence limit (UCL).
-- Empirical coverage of the UCL relative to the true population mean.
+### Inference criteria for separate work (excluded from the primary run)
 
-Inferential procedures are method-specific. A common t interval is not imposed on every method. Bootstrap procedures must repeat the relevant estimation workflow and preserve censoring information.
+Inference is excluded from the primary Monte Carlo: no confidence intervals, UCLs, bootstrap refits, or coverage simulation are run. Previously specified inferential outcomes include a two-sided 95% confidence interval for the mean, interval width and empirical coverage, and a one-sided 95% upper confidence limit (UCL) with empirical coverage relative to the true population mean. Existing inference reports remain unchanged and document prior inferential validation work; they are not outcomes of this point-estimator study. Inferential procedures remain method-specific; a common t interval is not imposed on every method.
 
 ## Failure and identifiability accounting
 
-Record convergence failures, non-finite estimates, non-identifiable statistics, failed bootstrap replicates, samples with all observations censored and samples with no censored observations. These outcomes must not be silently removed.
+For the primary run, record convergence failures, non-finite estimates, non-identifiable statistics, and samples with all observations censored or no censored observations. These outcomes must not be silently removed. Bootstrap failures do not apply because the primary run performs no bootstrap.
 
 ## Later model-misspecification scenario
 
@@ -92,7 +91,7 @@ A subsequent scenario will generate data from a Gamma distribution while retaini
 4. Test no-censoring, all-censored, low-censoring and higher-censoring edge cases.
 5. Compare package outputs and identify the estimator behind each statistic.
 6. Validate a pilot against theoretical quantities and independently calculated likelihoods.
-7. Only then run the full Monte Carlo experiment.
+7. After the functional and scientific review, run the approved primary point-estimator Monte Carlo.
 
 ## Initial references
 
@@ -105,20 +104,16 @@ A subsequent scenario will generate data from a Gamma distribution while retaini
 
 Package documentation: [NADA](https://cran.r-project.org/package=NADA), [NADA2](https://cran.r-project.org/package=NADA2), [EnvStats](https://cran.r-project.org/package=EnvStats).
 
-## Decisions still requiring validation
+## Prior validation record
 
-- Exact function interfaces and returned object structures for installed package versions.
-- How each package estimates moments under a common left-censoring threshold.
-- Confidence interval and UCL construction for ROS, MLE and reverse KM.
-- Bootstrap design and computational settings.
-- Treatment of samples with no detected observations or no censored observations.
+Prior estimator and inference evidence is retained in `reports/estimator_validation.md`, `reports/inference_validation.md`, and `reports/inference_bootstrap_stability.md`; this protocol change does not revise those results. Functional checks cover package interfaces and edge cases, but do not establish estimator validity. The bootstrap stability supplement found material endpoint changes in its targeted B=99 versus B=499 comparison; bootstrap settings are irrelevant to the primary run because inference is disabled.
 
 ## Current implementation and validation status
 
-The repository implements the seven methods listed above and a primary-run driver in `R/12_primary_monte_carlo.R`. The driver sends one generated sample to all selected methods, stores latent sample values only for evaluation, derives replicate seeds from an explicit master seed, and supports atomic per-scenario checkpoints and signature-checked resume. Its default replicate count remains the configured 2,000 per condition. A small functional smoke check verifies interruption, resume, and reproducibility; it is not evidence of estimator accuracy or inferential validity.
+The repository implements the seven methods listed above and a primary-run driver in `R/12_primary_monte_carlo.R`. The driver sends one generated sample to all selected methods, stores latent sample values only for evaluation, derives replicate seeds from the approved master seed, and supports atomic per-scenario checkpoints and signature-checked resume. The exact run uses 2,000 replicates per condition. A small functional smoke check verifies interruption, resume, and reproducibility; it is not evidence of estimator accuracy or inferential validity.
 
-Estimator and inference evidence is summarized in `reports/estimator_validation.md`, `reports/inference_validation.md`, and `reports/inference_bootstrap_stability.md`. The estimator diagnostics have stated reservations and do not validate intervals. Inference decisions remain specific to method, estimand, interval type, and condition; `not validated` and `inconclusive` are distinct outcomes. The targeted B=99 versus B=499 stability supplement shows material endpoint changes, so the bootstrap procedures remain preliminary. The configured `n_bootstrap_pilot = 2000` is not a final bootstrap recommendation.
+Estimator and inference evidence is summarized in `reports/estimator_validation.md`, `reports/inference_validation.md`, and `reports/inference_bootstrap_stability.md`. The estimator diagnostics have stated reservations and do not validate intervals. Inference decisions remain specific to method, estimand, interval type, and condition; `not validated` and `inconclusive` are distinct outcomes. These reports remain historical evidence and are not modified by the primary-run preparation.
 
-For reverse KM under the common LOQ, the mean is recorded as structurally non-identifiable and only quantiles returned by the fitted curve are considered; structural non-identifiability, sample non-estimability, and a missing returned quantile are kept separate. The primary runner therefore currently rejects `inference = TRUE`: the existing replication interface activates MLE and ROS bootstrap together. After scientific review, add method- and procedure-specific inference selection (including MLE log-Wald without bootstrap) before enabling inferential outcomes in the primary run.
+For reverse KM under the common LOQ, the mean is recorded as structurally non-identifiable and only quantiles returned by the fitted curve are considered; structural non-identifiability, sample non-estimability, and a missing returned quantile are kept separate. The runner rejects `inference = TRUE`; the primary run fixes `inference = FALSE` and has no inferential outcomes.
 
-The definitive lognormal Monte Carlo has not been launched. The 2,000-replicate design and the planned 5,000/10,000 Monte Carlo precision review remain as specified above; seed approval and the decision to extend replicate counts are open. No Gamma misspecification scenario or bootstrap stability run is authorized by this protocol update. Shared scientific review is required before the primary run begins.
+The definitive lognormal Monte Carlo has not been launched. Its approved seed is `20261122`, its replicate count is fixed at 2,000 per condition, and its dedicated output directory is `results/primary_monte_carlo_lognormal_seed_20261122/`. The directory is reserved and contains no simulation results. After review, run `Rscript simulations/run_primary_monte_carlo.R` from the repository root. Do not execute it during preparation. The later Gamma misspecification scenario remains separate and is not part of this run.
