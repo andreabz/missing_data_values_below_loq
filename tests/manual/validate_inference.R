@@ -15,6 +15,16 @@ undercovered <- classify_inference_coverage(430, 500, availability = 1)
 stopifnot(undercovered$status == "not validated", undercovered$undercoverage_p < 0.05)
 well_calibrated <- classify_inference_coverage(475, 500, availability = 1)
 stopifnot(well_calibrated$status == "validated")
+well_calibrated_ci <- stats::binom.test(475, 500, conf.level = 0.90)$conf.int
+stopifnot(isTRUE(all.equal(well_calibrated$lower, unname(well_calibrated_ci[[1L]]))),
+  isTRUE(all.equal(well_calibrated$upper, unname(well_calibrated_ci[[2L]]))),
+  well_calibrated$lower >= 0.93, well_calibrated$upper <= 0.97)
+expected_undercoverage_p <- stats::binom.test(430, 500, p = 0.95,
+  alternative = "less")$p.value
+stopifnot(isTRUE(all.equal(undercovered$undercoverage_p, expected_undercoverage_p)))
+weak_undercoverage <- classify_inference_coverage(468, 500, availability = 1)
+stopifnot(weak_undercoverage$undercoverage_p >= 0.05,
+  weak_undercoverage$status == "inconclusive", weak_undercoverage$lower < 0.93)
 imprecise <- classify_inference_coverage(9, 10, availability = 1)
 stopifnot(imprecise$status == "inconclusive")
 unavailable <- classify_inference_coverage(475, 500, availability = 0.90)
@@ -22,8 +32,41 @@ stopifnot(unavailable$status == "inconclusive")
 unconfirmed_stability <- classify_inference_coverage(475, 500, availability = 1,
   stability_confirmed = FALSE)
 stopifnot(unconfirmed_stability$status == "inconclusive")
-structural <- classify_inference_coverage(NA_real_, 0, availability = NA_real_)
-stopifnot(structural$status == "inconclusive")
+structural <- try(classify_inference_coverage(NA_real_, 0, availability = NA_real_), silent = TRUE)
+stopifnot(inherits(structural, "try-error"))
+structural_rkm <- classify_reverse_km_coverage(NA_real_, 0, NA_real_, applicable = FALSE)
+stopifnot(structural_rkm$status == "not applicable", is.na(structural_rkm$coverage))
+no_finite_rkm <- classify_reverse_km_coverage(0, 0, 0, applicable = TRUE)
+stopifnot(no_finite_rkm$status == "inconclusive", is.na(no_finite_rkm$coverage),
+  no_finite_rkm$availability == 0)
+
+invalid_decisions <- list(
+  function() classify_inference_coverage(1.5, 10),
+  function() classify_inference_coverage(-1, 10),
+  function() classify_inference_coverage(11, 10),
+  function() classify_inference_coverage(1, 0),
+  function() classify_inference_coverage(1, 10, availability = NA_real_),
+  function() classify_inference_coverage(1, 10, availability = 1.1),
+  function() classify_inference_coverage(1, 10, nominal = 1),
+  function() classify_inference_coverage(1, 10, nominal = NA_real_),
+  function() classify_inference_coverage(1, 10, tolerance = 0),
+  function() classify_inference_coverage(1, 10, alpha = 0.5),
+  function() classify_inference_coverage(1, 10, min_availability = -0.1),
+  function() classify_inference_coverage(1, 10, stability_confirmed = NA))
+stopifnot(all(vapply(invalid_decisions, function(f) inherits(try(f(), silent = TRUE),
+  "try-error"), logical(1))))
+
+ci_counts <- coverage_metrics(c(0, 2, NA_real_, 4), c(2, 4, 4, 6), c(1, 3, 3, 5))
+stopifnot(ci_counts[["coverage_successes"]] == 3, ci_counts[["n_total"]] == 4,
+  ci_counts[["available_intervals"]] == 3,
+  ci_counts[["conditional_successes"]] == 3,
+  ci_counts[["conditional_trials"]] == 3)
+ucl_counts <- ucl_metrics(c(2, 4, NA_real_, 5), c(1, 5, 2, 7))
+stopifnot(ucl_counts[["ucl_successes"]] == 1, ucl_counts[["n_total"]] == 4,
+  ucl_counts[["available_ucls"]] == 3)
+count_based_decision <- classify_inference_coverage(ci_counts[["coverage_successes"]],
+  ci_counts[["n_total"]], ci_counts[["finite_interval_rate"]])
+stopifnot(count_based_decision$successes == 3L, count_based_decision$trials == 4L)
 
 set.seed(731)
 n <- 80L
