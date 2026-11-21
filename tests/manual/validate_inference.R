@@ -13,6 +13,8 @@ stopifnot(identical(validate_bootstrap_replicates(20), 20L))
 # inconclusive precision, and interval availability.
 undercovered <- classify_inference_coverage(430, 500, availability = 1)
 stopifnot(undercovered$status == "not validated", undercovered$undercoverage_p < 0.05)
+stopifnot(classify_inference_coverage(430, 500, stability_confirmed = FALSE)$status ==
+  "not validated")
 well_calibrated <- classify_inference_coverage(475, 500, availability = 1)
 stopifnot(well_calibrated$status == "validated")
 well_calibrated_ci <- stats::binom.test(475, 500, conf.level = 0.90)$conf.int
@@ -46,6 +48,7 @@ invalid_decisions <- list(
   function() classify_inference_coverage(11, 10),
   function() classify_inference_coverage(1, 0),
   function() classify_inference_coverage(1, 10, availability = NA_real_),
+  function() classify_inference_coverage(1, 10, availability = -0.1),
   function() classify_inference_coverage(1, 10, availability = 1.1),
   function() classify_inference_coverage(1, 10, nominal = 1),
   function() classify_inference_coverage(1, 10, nominal = NA_real_),
