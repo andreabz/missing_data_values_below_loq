@@ -8,7 +8,8 @@ primary_mc_methods <- c("complete_case", "substitute_zero", "substitute_loq_half
 primary_mc_source_files <- c("R/00_config.R", "R/01_generate_sample.R",
   "R/02_method_results.R", "R/03_methods_simple.R", "R/04_method_ros.R",
   "R/05_method_mle.R", "R/06_method_reverse_km.R", "R/07_inference.R",
-  "R/08_single_replication.R", "R/09_evaluation.R", "R/12_primary_monte_carlo.R")
+  "R/08_single_replication.R", "R/09_evaluation.R", "R/12_primary_monte_carlo.R",
+  "simulations/run_primary_monte_carlo.R")
 
 validate_primary_mc_config <- function(config) {
   required <- c("distribution", "meanlog", "sdlog", "sample_sizes",
@@ -252,10 +253,12 @@ run_primary_monte_carlo <- function(seed, config = simulation_config,
     run_manifest$started_at_utc <- previous$started_at_utc
     run_manifest$git_commit <- previous$git_commit
     run_manifest$completed_by_scenario <- previous$completed_by_scenario
-  } else if (!is.null(run_manifest_path) && !isTRUE(resume)) {
-    # A fresh run may not silently overwrite scenario checkpoints without a manifest.
-    existing <- list.files(checkpoint_dir, pattern = "\\.rds$", full.names = TRUE)
-    if (length(existing)) stop("Checkpoint files already exist without a resumable run manifest")
+  } else if (!is.null(run_manifest_path)) {
+    # Without a manifest, only an empty directory or its reservation marker is safe.
+    existing <- list.files(checkpoint_dir, all.files = TRUE, no.. = TRUE)
+    existing <- setdiff(existing, ".gitkeep")
+    if (length(existing))
+      stop("Checkpoint directory is not empty and has no resumable run manifest")
   }
 
   if (!is.null(run_manifest_path)) primary_mc_atomic_save(run_manifest, run_manifest_path)
