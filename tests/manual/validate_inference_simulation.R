@@ -65,25 +65,6 @@ one_replication <- function(id, n, loq, cp, condition_id) {
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-coverage_metrics <- function(lower, upper, target) {
-  n <- length(target)
-  finite <- is.finite(lower) & is.finite(upper) & lower <= upper
-  covered <- finite & lower <= target & upper >= target
-  rate <- mean(covered)
-  c(coverage_all = rate, mcse = sqrt(rate * (1 - rate) / n),
-    conditional_coverage = if (any(finite)) mean(covered[finite]) else NA_real_,
-    finite_interval_rate = mean(finite),
-    mean_width = if (any(finite)) mean(upper[finite] - lower[finite]) else NA_real_)
-}
-
-ucl_metrics <- function(ucl, target) {
-  finite <- is.finite(ucl)
-  covered <- finite & ucl >= target
-  rate <- mean(covered)
-  c(coverage_all = rate, mcse = sqrt(rate * (1 - rate) / length(target)),
-    finite_ucl_rate = mean(finite), mean_ucl = if (any(finite)) mean(ucl[finite]) else NA_real_)
-}
-
 point_metrics <- function(x, target) {
   finite <- is.finite(x)
   e <- x[finite] - target
@@ -129,7 +110,9 @@ for (n in settings$sample_sizes) for (j in seq_along(settings$censoring_probabil
     hi <- vapply(interval, function(x) x[["upper"]], numeric(1))
     applicable <- settings$reverse_probs[k] > cp
     na_metrics <- c(coverage_all = NA_real_, mcse = NA_real_, conditional_coverage = NA_real_,
-      finite_interval_rate = NA_real_, mean_width = NA_real_)
+      finite_interval_rate = NA_real_, mean_width = NA_real_, coverage_successes = NA_real_,
+      n_total = NA_real_, available_intervals = NA_real_, conditional_successes = NA_real_,
+      conditional_trials = NA_real_)
     list(prob = settings$reverse_probs[k], applicable = applicable,
       point = if (applicable) point_metrics(estimate, true_quantiles[k]) else
         c(bias = NA_real_, rmse = NA_real_, empirical_sd = NA_real_, finite_rate = 0),
@@ -218,7 +201,7 @@ lines <- c("# Validation of inference procedures for censored estimators", "",
   "", "**ROS.** Estimand: arithmetic mean of the distribution reconstructed by ROS, used as an estimate of the population mean. Primary bootstrap resamples whole observed (value, censoring, LOQ) rows and refits ROS in every draw. Percentile and basic intervals are evaluated; the percentile UCL is the bootstrap 0.95 quantile, while the basic UCL reflects the bootstrap 0.05 quantile around the original estimate. No modeled ROS value is treated as an original observation. BCa was excluded because ties and non-identifiable resamples make the jackknife acceleration unstable.",
   "", "**Reverse KM.** The estimand is each requested quantile with p > F(LOQ); no nonparametric mean interval is produced. Quantile bands are formed by inverting the plain Greenwood lower/upper CDF bands from `NADA::cenfit`. The installed `quantile(cenfit, conf.int=TRUE)` method was inspected and not used: its source passes the probability ordinate in place of the time coordinate while calculating its endpoints. The upper CDF band gives the lower quantile limit; the lower CDF band gives the upper limit. The simulation labels p <= known theoretical F(LOQ) as structurally non-identifiable; p > F(LOQ) but at/below the realized sample censoring fraction as not estimable in that sample; and missing point/band crossings as numerical/tail return limitations.",
   "", "## Results by sample size and LOQ", "",
-  "Coverage is unconditional over all simulation replicates: missing/non-finite intervals count as uncovered. Conditional coverage among finite intervals and finite-return rates are also shown. MCSE is the binomial standard error of unconditional coverage. Width is averaged over finite intervals.", "")
+  "For MLE and ROS, coverage is unconditional over all simulation replicates: missing/non-finite intervals count as uncovered. Conditional coverage among finite intervals and finite-return rates are also shown. For Reverse KM, decision coverage is conditional on a finite returned band for an identifiable quantile, while availability is the proportion of all simulation replicates returning such a band; conditional coverage is not the unconditional probability of obtaining a usable covering interval. MCSE is the binomial standard error of unconditional coverage. Width is averaged over finite intervals.", "")
 for (key in names(condition_results)) {
   z <- condition_results[[key]]
   lines <- c(lines, paste0("### n=", z$n, ", F(LOQ)=", z$cp), "",
@@ -234,10 +217,10 @@ for (key in names(condition_results)) {
     p <- row[[2L]]; ci <- row[[3L]]; u <- row[[4L]]
     stability_confirmed <- row[[1L]] == "MLE log-Wald"
     interval_decision <- classify_inference_coverage(
-      round(ci[["coverage_all"]] * settings$n_simulations), settings$n_simulations,
+      ci[["coverage_successes"]], ci[["n_total"]],
       ci[["finite_interval_rate"]], stability_confirmed = stability_confirmed)
     ucl_decision <- classify_inference_coverage(
-      round(u[["coverage_all"]] * settings$n_simulations), settings$n_simulations,
+      u[["ucl_successes"]], u[["n_total"]],
       u[["finite_ucl_rate"]], stability_confirmed = stability_confirmed)
     lines <- c(lines, paste0("| ", row[[1L]], " | ", fmt(p[["bias"]]), " | ", fmt(p[["rmse"]]),
       " | ", fmt(ci[["coverage_all"]]), " (", fmt(ci[["mcse"]]), ") | ",
@@ -268,10 +251,9 @@ for (key in names(condition_results)) {
     status_text <- paste(paste(names(q$statuses), as.integer(q$statuses), sep = ": "), collapse = ", ")
     if (!q$applicable) coverage_status <- "not applicable: structurally non-identifiable"
     else {
-      usable_n <- round(q$interval[["finite_interval_rate"]] * settings$n_simulations)
-      covered_n <- round(q$interval[["conditional_coverage"]] * usable_n)
-      coverage_status <- classify_inference_coverage(covered_n, usable_n,
-        q$interval[["finite_interval_rate"]])$status
+      coverage_status <- classify_reverse_km_coverage(
+        q$interval[["conditional_successes"]], q$interval[["conditional_trials"]],
+        q$interval[["finite_interval_rate"]], applicable = TRUE)$status
     }
     lines <- c(lines, paste0("| ", qname, " | ", fmt(q$point[["bias"]]), " | ", fmt(q$point[["rmse"]]),
       " | ", fmt(q$point[["finite_rate"]]), " | ", fmt(q$interval[["coverage_all"]]), " (",
@@ -291,7 +273,8 @@ for (key in names(stability)) for (method in names(stability[[key]])) {
   lines <- c(lines, paste0("| ", key, " | ", method, " | ", fmt(x[[1L]]), " | ", fmt(x[[2L]]), " | ", fmt(x[[3L]]), " |"))
 }
 lines <- c(lines, "", "## Decision rules", "",
-  "Each experimental condition, method, estimand and interval type is classified separately. The coverage target is the nominal 0.95. A one-sided exact binomial test (`binom.test`, alternative = `less`, alpha = 0.05) identifies statistically significant undercoverage; that result is **not validated**. Availability is reported separately and must be at least 0.95 for validation. A procedure is **validated** only when the 90% exact binomial interval for coverage lies wholly within 0.93–0.97 (equivalence bounds of +/- 0.02 around nominal), availability is at least 0.95, and any bootstrap endpoints have demonstrated stability. All other cases without significant undercoverage are **inconclusive**; failure to reject undercoverage alone is not evidence of validity.",
+  "Each experimental condition, method, estimand and interval type is classified separately. The coverage target is the nominal 0.95. A one-sided exact binomial test (`binom.test`, alternative = `less`, alpha = 0.05) identifies statistically significant undercoverage; that result is **not validated**. Validation also requires a two-sided exact Clopper–Pearson interval at confidence 1 - 2*alpha = 0.90 wholly within 0.93–0.97. This is the equal-tailed confidence-interval form of two one-sided equivalence tests at alpha=0.05 for the +/-0.02 margin. Availability is reported separately and must be at least 0.95 for validation. Bootstrap procedures also require demonstrated endpoint stability; otherwise they remain **inconclusive** unless undercoverage is significant. All other cases without significant undercoverage are **inconclusive**; failure to reject undercoverage alone is not evidence of validity.",
+  "", "The alpha=0.05 classifications are scenario-specific and descriptive. No Holm correction is applied because these rows make no simultaneous or family-wide validation claim. The per-stratum statuses do not guarantee family-wise error control and must not be combined into a global claim that a procedure family is validated.",
   "", "Two-sided 95% mean intervals and one-sided 95% UCLs have separate decisions. Reverse-KM coverage is conditional on returning a finite interval for a theoretically identifiable quantile; its unconditional interval availability remains a separate metric. Structural non-identifiability is not assessed as coverage.",
   "", "B=99 results remain preliminary pending targeted endpoint stability verification. The targeted B=99/B=499 supplement is reported separately in `reports/inference_bootstrap_stability.md`; it does not replace or recompute the six-condition coverage simulation.",
   "", "No Gamma misspecification scenario or primary Monte Carlo was run.", "")
