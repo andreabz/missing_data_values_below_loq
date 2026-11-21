@@ -19,6 +19,9 @@ imprecise <- classify_inference_coverage(9, 10, availability = 1)
 stopifnot(imprecise$status == "inconclusive")
 unavailable <- classify_inference_coverage(475, 500, availability = 0.90)
 stopifnot(unavailable$status == "inconclusive")
+unconfirmed_stability <- classify_inference_coverage(475, 500, availability = 1,
+  stability_confirmed = FALSE)
+stopifnot(unconfirmed_stability$status == "inconclusive")
 structural <- classify_inference_coverage(NA_real_, 0, availability = NA_real_)
 stopifnot(structural$status == "inconclusive")
 
