@@ -233,7 +233,7 @@ The reported paired comparison requires 71,760 refits: 35,880 each for MLE and R
 
 ## Stratified status reassessment
 
-Reclassified from the existing 500-replicate results only; no simulation numbers were changed or recomputed. `Not validated` means the one-sided exact binomial test found undercoverage below 0.95 at alpha=0.05. `Validated` requires the 90% exact coverage interval to fit inside 0.93–0.97 and availability >=0.95. Other cases are `inconclusive`. Reverse-KM coverage is conditional on a finite returned band; availability is reported separately.
+Reclassified from the existing 500-replicate results only; no simulation numbers were changed or recomputed. `Not validated` means the one-sided exact binomial test found undercoverage below 0.95 at alpha=0.05. `Validated` requires the 90% exact coverage interval to fit inside 0.93–0.97, availability >=0.95, and demonstrated endpoint stability for bootstrap procedures. Other cases are `inconclusive`. Reverse-KM coverage is conditional on a finite returned band; availability is reported separately.
 
 | Condition | Method / estimand | Interval type | Status | Interval availability |
 |---|---|---|---|---:|
@@ -310,7 +310,7 @@ Reclassified from the existing 500-replicate results only; no simulation numbers
 | n=500, F(LOQ)=0.4 | MLE log-Wald | two-sided 95% CI | inconclusive | 1.0000 |
 | n=500, F(LOQ)=0.4 | MLE log-Wald | one-sided 95% UCL | inconclusive | 1.0000 |
 | n=500, F(LOQ)=0.4 | MLE parametric percentile | two-sided 95% CI | inconclusive | 1.0000 |
-| n=500, F(LOQ)=0.4 | MLE parametric percentile | one-sided 95% UCL | validated | 1.0000 |
+| n=500, F(LOQ)=0.4 | MLE parametric percentile | one-sided 95% UCL | inconclusive | 1.0000 |
 | n=500, F(LOQ)=0.4 | ROS percentile | two-sided 95% CI | inconclusive | 1.0000 |
 | n=500, F(LOQ)=0.4 | ROS percentile | one-sided 95% UCL | inconclusive | 1.0000 |
 | n=500, F(LOQ)=0.4 | ROS basic | two-sided 95% CI | inconclusive | 1.0000 |
