@@ -204,7 +204,7 @@ Reverse-KM quantiles (error and coverage among finite estimates/intervals; finit
 | q0.75 | -0.0080 | 0.1188 | 1.0000 | 0.9480 (0.0099) | 0.9480 | 1.0000 | 0.4583 | success: 500 |
 | q0.9 | -0.0008 | 0.2470 | 1.0000 | 0.9520 (0.0096) | 0.9520 | 1.0000 | 1.0602 | success: 500 |
 
-## Bootstrap B stability
+## Original preliminary bootstrap B stability check
 
 On 10 samples per condition, compare endpoint changes for B=99 vs B=199.
 
@@ -223,15 +223,102 @@ On 10 samples per condition, compare endpoint changes for B=99 vs B=199.
 | n500_cp0.4 | mle | 0.0137 | 0.0573 | 0.0623 |
 | n500_cp0.4 | ros | 0.0152 | 0.0410 | 0.0561 |
 
-## Decisions
+## Targeted bootstrap stability supplement
 
-Decisions are assigned mechanically from finite rates and nominal coverage: a candidate is **validated** only if its unconditional coverage is within two Monte Carlo standard errors of 0.95 in every applicable condition, the finite interval rate is at least 0.95, and UCL coverage is within two MCSE of 0.95 where an UCL is defined. Otherwise it is **validated with reservations** when operational but misses a threshold, or **not validated** when its procedure is unavailable/unstable. These criteria do not replace scientific judgment.
+This additional check is separate from the original six-condition coverage simulation. The two n=30 conditions were selected because they had the largest observed undercoverage among the bootstrap mean intervals. Thirty deterministic samples per condition were compared at B=99 and B=499, with the same random-number stream so the B=99 draws are a prefix of the B=499 draws. Only MLE parametric percentile intervals and ROS percentile/basic intervals were included; no point estimators or inference procedures were changed.
 
-- **MLE log-Wald mean interval:** validated with reservations.
-- **MLE parametric percentile interval:** validated with reservations; UCL evaluated separately.
-- **ROS percentile interval:** validated with reservations; full refit bootstrap.
-- **ROS basic interval:** validated with reservations; full refit bootstrap.
-- **Reverse-KM quantile bands:** validated with reservations; the mean is non-identifiable and no mean interval/UCL is calculated.
+The endpoint-specific median absolute changes ranged from 0.0202 to 0.0870; the 90th percentiles ranged from 0.0599 to 0.2515 and maxima from 0.1024 to 0.5175. In the paired subset, B=99 to B=499 inclusion counts changed by at most one sample for every procedure and condition (see [the supplement](inference_bootstrap_stability.md)). These 30 cases are descriptive and do not supply a new coverage estimate. The endpoint variation is material, so B=99 bootstrap coverage remains preliminary and the targeted check does not establish endpoint stability or justify promotion to validated.
 
-Failure rates and non-identifiability are retained in each stratum. A procedure returning finite intervals is not, by itself, considered validated. No Gamma misspecification scenario or primary Monte Carlo was run.
+The reported paired comparison requires 71,760 refits: 35,880 each for MLE and ROS across the two conditions. The same deterministic comparison was executed twice to replace an initially endpoint-aggregated summary with separate lower/upper endpoint summaries, so the total compute spent was 143,520 refits. This is about 24% of the original 594,000 refits; proportional to the original run taking over two hours, the estimated cost exceeds 29 minutes. Wall time for the supplementary run was not separately recorded.
+
+## Stratified status reassessment
+
+Reclassified from the existing 500-replicate results only; no simulation numbers were changed or recomputed. `Not validated` means the one-sided exact binomial test found undercoverage below 0.95 at alpha=0.05. `Validated` requires the 90% exact coverage interval to fit inside 0.93–0.97, availability >=0.95, and demonstrated endpoint stability for bootstrap procedures. Other cases are `inconclusive`. Reverse-KM coverage is conditional on a finite returned band; availability is reported separately.
+
+| Condition | Method / estimand | Interval type | Status | Interval availability |
+|---|---|---|---|---:|
+| n=30, F(LOQ)=0.1 | MLE log-Wald | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | MLE log-Wald | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | MLE parametric percentile | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | MLE parametric percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | ROS percentile | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | ROS percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | ROS basic | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | ROS basic | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | Reverse KM q0.1 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=30, F(LOQ)=0.1 | Reverse KM q0.25 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 0.9940 |
+| n=30, F(LOQ)=0.1 | Reverse KM q0.4 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=30, F(LOQ)=0.1 | Reverse KM q0.5 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=30, F(LOQ)=0.1 | Reverse KM q0.75 quantile band (conditional coverage) | two-sided 95% band | validated | 1.0000 |
+| n=30, F(LOQ)=0.1 | Reverse KM q0.9 quantile band (conditional coverage) | two-sided 95% band | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | MLE log-Wald | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | MLE log-Wald | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | MLE parametric percentile | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | MLE parametric percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | ROS percentile | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | ROS percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | ROS basic | two-sided 95% CI | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | ROS basic | one-sided 95% UCL | not validated | 1.0000 |
+| n=30, F(LOQ)=0.4 | Reverse KM q0.1 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=30, F(LOQ)=0.4 | Reverse KM q0.25 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=30, F(LOQ)=0.4 | Reverse KM q0.4 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=30, F(LOQ)=0.4 | Reverse KM q0.5 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 0.8160 |
+| n=30, F(LOQ)=0.4 | Reverse KM q0.75 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=30, F(LOQ)=0.4 | Reverse KM q0.9 quantile band (conditional coverage) | two-sided 95% band | not validated | 1.0000 |
+| n=100, F(LOQ)=0.1 | MLE log-Wald | two-sided 95% CI | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | MLE log-Wald | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | MLE parametric percentile | two-sided 95% CI | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | MLE parametric percentile | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | ROS percentile | two-sided 95% CI | not validated | 1.0000 |
+| n=100, F(LOQ)=0.1 | ROS percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=100, F(LOQ)=0.1 | ROS basic | two-sided 95% CI | not validated | 1.0000 |
+| n=100, F(LOQ)=0.1 | ROS basic | one-sided 95% UCL | not validated | 1.0000 |
+| n=100, F(LOQ)=0.1 | Reverse KM q0.1 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=100, F(LOQ)=0.1 | Reverse KM q0.25 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | Reverse KM q0.4 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | Reverse KM q0.5 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | Reverse KM q0.75 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.1 | Reverse KM q0.9 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.4 | MLE log-Wald | two-sided 95% CI | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.4 | MLE log-Wald | one-sided 95% UCL | not validated | 1.0000 |
+| n=100, F(LOQ)=0.4 | MLE parametric percentile | two-sided 95% CI | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.4 | MLE parametric percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=100, F(LOQ)=0.4 | ROS percentile | two-sided 95% CI | not validated | 1.0000 |
+| n=100, F(LOQ)=0.4 | ROS percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=100, F(LOQ)=0.4 | ROS basic | two-sided 95% CI | not validated | 1.0000 |
+| n=100, F(LOQ)=0.4 | ROS basic | one-sided 95% UCL | not validated | 1.0000 |
+| n=100, F(LOQ)=0.4 | Reverse KM q0.1 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=100, F(LOQ)=0.4 | Reverse KM q0.25 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=100, F(LOQ)=0.4 | Reverse KM q0.4 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=100, F(LOQ)=0.4 | Reverse KM q0.5 quantile band (conditional coverage) | two-sided 95% band | validated | 0.9600 |
+| n=100, F(LOQ)=0.4 | Reverse KM q0.75 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=100, F(LOQ)=0.4 | Reverse KM q0.9 quantile band (conditional coverage) | two-sided 95% band | not validated | 1.0000 |
+| n=500, F(LOQ)=0.1 | MLE log-Wald | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | MLE log-Wald | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | MLE parametric percentile | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | MLE parametric percentile | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | ROS percentile | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | ROS percentile | one-sided 95% UCL | not validated | 1.0000 |
+| n=500, F(LOQ)=0.1 | ROS basic | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | ROS basic | one-sided 95% UCL | not validated | 1.0000 |
+| n=500, F(LOQ)=0.1 | Reverse KM q0.1 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=500, F(LOQ)=0.1 | Reverse KM q0.25 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | Reverse KM q0.4 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.1 | Reverse KM q0.5 quantile band (conditional coverage) | two-sided 95% band | validated | 1.0000 |
+| n=500, F(LOQ)=0.1 | Reverse KM q0.75 quantile band (conditional coverage) | two-sided 95% band | validated | 1.0000 |
+| n=500, F(LOQ)=0.1 | Reverse KM q0.9 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | MLE log-Wald | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | MLE log-Wald | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | MLE parametric percentile | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | MLE parametric percentile | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | ROS percentile | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | ROS percentile | one-sided 95% UCL | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | ROS basic | two-sided 95% CI | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | ROS basic | one-sided 95% UCL | not validated | 1.0000 |
+| n=500, F(LOQ)=0.4 | Reverse KM q0.1 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=500, F(LOQ)=0.4 | Reverse KM q0.25 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=500, F(LOQ)=0.4 | Reverse KM q0.4 quantile band (conditional coverage) | two-sided 95% band | not applicable: structurally non-identifiable | NA |
+| n=500, F(LOQ)=0.4 | Reverse KM q0.5 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | Reverse KM q0.75 quantile band (conditional coverage) | two-sided 95% band | inconclusive | 1.0000 |
+| n=500, F(LOQ)=0.4 | Reverse KM q0.9 quantile band (conditional coverage) | two-sided 95% band | validated | 1.0000 |
 
