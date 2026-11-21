@@ -17,6 +17,10 @@ first <- run_primary_monte_carlo(seed = smoke_seed, config = smoke_config,
   max_new_replicates = 3L)
 stopifnot(!first$complete, sum(first$manifest$completed_by_scenario) == 3L,
   nrow(first$pending) == 3L)
+signature_mismatch <- try(run_primary_monte_carlo(seed = smoke_seed + 1L,
+  config = smoke_config, checkpoint_dir = checkpoint_dir), silent = TRUE)
+stopifnot(inherits(signature_mismatch, "try-error"),
+  grepl("does not match configuration", as.character(signature_mismatch), fixed = TRUE))
 
 resumed <- run_primary_monte_carlo(seed = smoke_seed, config = smoke_config,
   checkpoint_dir = checkpoint_dir, checkpoint_every = 1L, resume = TRUE)
@@ -40,6 +44,14 @@ stopifnot(identical(primary_mc_replicate_seed(smoke_seed, 2L, 1L),
   primary_mc_replicate_seed(smoke_seed, 2L, 1L)),
   primary_mc_replicate_seed(smoke_seed, 2L, 1L) !=
     primary_mc_replicate_seed(smoke_seed, 2L, 2L))
+unsafe_dir <- file.path(temporary_root, "unrecognized-files")
+dir.create(unsafe_dir)
+writeLines("preserve", file.path(unsafe_dir, "keep-me.txt"))
+unsafe_error <- try(run_primary_monte_carlo(seed = smoke_seed, config = smoke_config,
+  checkpoint_dir = unsafe_dir), silent = TRUE)
+stopifnot(inherits(unsafe_error, "try-error"),
+  grepl("not empty", as.character(unsafe_error), fixed = TRUE),
+  file.exists(file.path(unsafe_dir, "keep-me.txt")))
 inference_error <- try(run_primary_monte_carlo(seed = smoke_seed, config = smoke_config,
   inference = TRUE), silent = TRUE)
 stopifnot(inherits(inference_error, "try-error"),
