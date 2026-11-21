@@ -232,12 +232,13 @@ for (key in names(condition_results)) {
     list("ROS basic", z$ros$point, z$ros$basic, z$ros$ucl_basic))
   for (row in rows) {
     p <- row[[2L]]; ci <- row[[3L]]; u <- row[[4L]]
+    stability_confirmed <- row[[1L]] == "MLE log-Wald"
     interval_decision <- classify_inference_coverage(
       round(ci[["coverage_all"]] * settings$n_simulations), settings$n_simulations,
-      ci[["finite_interval_rate"]])
+      ci[["finite_interval_rate"]], stability_confirmed = stability_confirmed)
     ucl_decision <- classify_inference_coverage(
       round(u[["coverage_all"]] * settings$n_simulations), settings$n_simulations,
-      u[["finite_ucl_rate"]])
+      u[["finite_ucl_rate"]], stability_confirmed = stability_confirmed)
     lines <- c(lines, paste0("| ", row[[1L]], " | ", fmt(p[["bias"]]), " | ", fmt(p[["rmse"]]),
       " | ", fmt(ci[["coverage_all"]]), " (", fmt(ci[["mcse"]]), ") | ",
       fmt(ci[["conditional_coverage"]]), " | ", fmt(ci[["finite_interval_rate"]]), " | ",
@@ -290,7 +291,7 @@ for (key in names(stability)) for (method in names(stability[[key]])) {
   lines <- c(lines, paste0("| ", key, " | ", method, " | ", fmt(x[[1L]]), " | ", fmt(x[[2L]]), " | ", fmt(x[[3L]]), " |"))
 }
 lines <- c(lines, "", "## Decision rules", "",
-  "Each experimental condition, method, estimand and interval type is classified separately. The coverage target is the nominal 0.95. A one-sided exact binomial test (`binom.test`, alternative = `less`, alpha = 0.05) identifies statistically significant undercoverage; that result is **not validated**. Availability is reported separately and must be at least 0.95 for validation. A procedure is **validated** only when the 90% exact binomial interval for coverage lies wholly within 0.93–0.97 (equivalence bounds of +/- 0.02 around nominal) and availability is at least 0.95. All other cases without significant undercoverage are **inconclusive**; failure to reject undercoverage alone is not evidence of validity.",
+  "Each experimental condition, method, estimand and interval type is classified separately. The coverage target is the nominal 0.95. A one-sided exact binomial test (`binom.test`, alternative = `less`, alpha = 0.05) identifies statistically significant undercoverage; that result is **not validated**. Availability is reported separately and must be at least 0.95 for validation. A procedure is **validated** only when the 90% exact binomial interval for coverage lies wholly within 0.93–0.97 (equivalence bounds of +/- 0.02 around nominal), availability is at least 0.95, and any bootstrap endpoints have demonstrated stability. All other cases without significant undercoverage are **inconclusive**; failure to reject undercoverage alone is not evidence of validity.",
   "", "Two-sided 95% mean intervals and one-sided 95% UCLs have separate decisions. Reverse-KM coverage is conditional on returning a finite interval for a theoretically identifiable quantile; its unconditional interval availability remains a separate metric. Structural non-identifiability is not assessed as coverage.",
   "", "B=99 results remain preliminary pending targeted endpoint stability verification. The targeted B=99/B=499 supplement is reported separately in `reports/inference_bootstrap_stability.md`; it does not replace or recompute the six-condition coverage simulation.",
   "", "No Gamma misspecification scenario or primary Monte Carlo was run.", "")
