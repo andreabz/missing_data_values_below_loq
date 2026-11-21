@@ -1,7 +1,8 @@
 # Contained simulation of candidate inference procedures. It uses the
 # protocol's lognormal model, n, and absolute LOQs, but never reads n_monte_carlo.
 for (file in c("R/02_method_results.R", "R/04_method_ros.R", "R/05_method_mle.R",
-               "R/06_method_reverse_km.R", "R/07_inference.R")) source(file)
+               "R/06_method_reverse_km.R", "R/07_inference.R",
+               "R/11_inference_validation_decisions.R")) source(file)
 ensure_censoring_packages_attached()
 
 env_integer <- function(name, default) {
@@ -222,8 +223,8 @@ for (key in names(condition_results)) {
   z <- condition_results[[key]]
   lines <- c(lines, paste0("### n=", z$n, ", F(LOQ)=", z$cp), "",
     paste0("Mean realized censoring proportion: ", fmt(z$observed_censoring_mean), "."), "",
-    "| Procedure | Point bias | Point RMSE | 95% coverage (MCSE) | Conditional coverage | Finite interval rate | Mean width | UCL coverage (MCSE) | Finite UCL rate |",
-    "|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    "| Procedure | Point bias | Point RMSE | 95% coverage (MCSE) | Conditional coverage | Finite interval rate | Mean width | IC status | UCL coverage (MCSE) | Finite UCL rate | UCL status |",
+    "|---|---:|---:|---:|---:|---:|---:|---|---:|---:|---|")
   rows <- list(
     list("MLE log-Wald", z$mle$point, z$mle$delta, z$mle$ucl_delta),
     list("MLE parametric percentile", z$mle$point, z$mle$parametric_bootstrap, z$mle$ucl_parametric_bootstrap),
@@ -231,11 +232,18 @@ for (key in names(condition_results)) {
     list("ROS basic", z$ros$point, z$ros$basic, z$ros$ucl_basic))
   for (row in rows) {
     p <- row[[2L]]; ci <- row[[3L]]; u <- row[[4L]]
+    interval_decision <- classify_inference_coverage(
+      round(ci[["coverage_all"]] * settings$n_simulations), settings$n_simulations,
+      ci[["finite_interval_rate"]])
+    ucl_decision <- classify_inference_coverage(
+      round(u[["coverage_all"]] * settings$n_simulations), settings$n_simulations,
+      u[["finite_ucl_rate"]])
     lines <- c(lines, paste0("| ", row[[1L]], " | ", fmt(p[["bias"]]), " | ", fmt(p[["rmse"]]),
       " | ", fmt(ci[["coverage_all"]]), " (", fmt(ci[["mcse"]]), ") | ",
       fmt(ci[["conditional_coverage"]]), " | ", fmt(ci[["finite_interval_rate"]]), " | ",
-      fmt(ci[["mean_width"]]), " | ", fmt(u[["coverage_all"]]), " (", fmt(u[["mcse"]]), ") | ",
-      fmt(u[["finite_ucl_rate"]]), " |"))
+      fmt(ci[["mean_width"]]), " | ", interval_decision$status, " | ",
+      fmt(u[["coverage_all"]]), " (", fmt(u[["mcse"]]), ") | ",
+      fmt(u[["finite_ucl_rate"]]), " | ", ucl_decision$status, " |"))
   }
   lines <- c(lines, "", paste0("MLE bootstrap: requested ", z$mle$bootstrap_counts[["requested"]],
     "; valid ", z$mle$bootstrap_counts[["valid"]], "; failed ", z$mle$bootstrap_counts[["failed"]],
@@ -252,19 +260,27 @@ for (key in names(condition_results)) {
         paste(paste0("q", settings$reverse_probs[settings$reverse_probs <= z$cp]), collapse = ", "))
       else "none among requested probabilities."), "",
     "Reverse-KM quantiles (error and coverage among finite estimates/intervals; finite rates use all replicates):", "",
-    "| Quantile | Point bias | Point RMSE | Finite point rate | 95% coverage (MCSE) | Conditional coverage | Finite interval rate | Mean width | Status counts |",
-    "|---|---:|---:|---:|---:|---:|---:|---:|---|")
+    "| Quantile | Point bias | Point RMSE | Finite point rate | 95% coverage (MCSE) | Conditional coverage | Finite interval rate | Mean width | Conditional coverage status | Status counts |",
+    "|---|---:|---:|---:|---:|---:|---:|---:|---|---|")
   for (qname in names(z$reverse_km)) {
     q <- z$reverse_km[[qname]]
     status_text <- paste(paste(names(q$statuses), as.integer(q$statuses), sep = ": "), collapse = ", ")
+    if (!q$applicable) coverage_status <- "not applicable: structurally non-identifiable"
+    else {
+      usable_n <- round(q$interval[["finite_interval_rate"]] * settings$n_simulations)
+      covered_n <- round(q$interval[["conditional_coverage"]] * usable_n)
+      coverage_status <- classify_inference_coverage(covered_n, usable_n,
+        q$interval[["finite_interval_rate"]])$status
+    }
     lines <- c(lines, paste0("| ", qname, " | ", fmt(q$point[["bias"]]), " | ", fmt(q$point[["rmse"]]),
       " | ", fmt(q$point[["finite_rate"]]), " | ", fmt(q$interval[["coverage_all"]]), " (",
       fmt(q$interval[["mcse"]]), ") | ", fmt(q$interval[["conditional_coverage"]]), " | ",
-      fmt(q$interval[["finite_interval_rate"]]), " | ", fmt(q$interval[["mean_width"]]), " | ", status_text, " |"))
+      fmt(q$interval[["finite_interval_rate"]]), " | ", fmt(q$interval[["mean_width"]]), " | ",
+      coverage_status, " | ", status_text, " |"))
   }
   lines <- c(lines, "")
 }
-lines <- c(lines, "## Bootstrap B stability", "",
+lines <- c(lines, "## Bootstrap B stability (verification already run)", "",
   paste0("On ", settings$stability_cases_per_condition, " samples per condition, compare endpoint changes for B=",
     settings$bootstrap_replicates, " vs B=", settings$stability_replicates, "."), "",
   "| Condition | Procedure | Median absolute endpoint change | 90th percentile | Maximum |",
@@ -273,53 +289,10 @@ for (key in names(stability)) for (method in names(stability[[key]])) {
   x <- stability[[key]][[method]]
   lines <- c(lines, paste0("| ", key, " | ", method, " | ", fmt(x[[1L]]), " | ", fmt(x[[2L]]), " | ", fmt(x[[3L]]), " |"))
 }
-lines <- c(lines, "", "## Decisions", "",
-  "Decisions are assigned mechanically from finite rates and nominal coverage: a candidate is **validated** only if its unconditional coverage is within two Monte Carlo standard errors of 0.95 in every applicable condition, the finite interval rate is at least 0.95, and UCL coverage is within two MCSE of 0.95 where an UCL is defined. Otherwise it is **validated with reservations** when operational but misses a threshold, or **not validated** when its procedure is unavailable/unstable. These criteria do not replace scientific judgment.", "")
-decision <- function(path, require_ucl = TRUE) {
-  vals <- lapply(condition_results, function(x) {
-    z <- x
-    for (p in path) z <- z[[p]]
-    z
-  })
-  coverage_ok <- all(vapply(vals, function(x) is.finite(x[["coverage_all"]]) &&
-    abs(x[["coverage_all"]] - 0.95) <= 2 * x[["mcse"]], logical(1)))
-  finite_ok <- all(vapply(vals, function(x) is.finite(x[["finite_interval_rate"]]) &&
-    x[["finite_interval_rate"]] >= 0.95, logical(1)))
-  ucl_ok <- TRUE
-  if (require_ucl) {
-    ucl_values <- lapply(condition_results, function(x) {
-      proc <- x[[path[1L]]]
-      if (length(path) == 2L && path[2L] == "delta") proc$ucl_delta else
-        if (length(path) == 2L && path[2L] == "parametric_bootstrap") proc$ucl_parametric_bootstrap else
-          if (length(path) == 2L && path[2L] == "percentile") proc$ucl_percentile else proc$ucl_basic
-    })
-    ucl_ok <- all(vapply(ucl_values, function(x) is.finite(x[["coverage_all"]]) &&
-      abs(x[["coverage_all"]] - 0.95) <= 2 * x[["mcse"]] && x[["finite_ucl_rate"]] >= 0.95,
-      logical(1)))
-  }
-  finite_rate <- vapply(vals, function(x) x[["finite_interval_rate"]], numeric(1))
-  if (any(is.finite(finite_rate) & finite_rate < 0.80)) return("not validated")
-  if (coverage_ok && finite_ok && ucl_ok) "validated" else "validated with reservations"
-}
-reverse_decision <- function() {
-  metrics <- unlist(lapply(condition_results, function(condition)
-    lapply(condition$reverse_km[vapply(condition$reverse_km, `[[`, logical(1), "applicable")],
-      `[[`, "interval")), recursive = FALSE)
-  finite <- vapply(metrics, `[[`, numeric(1), "finite_interval_rate")
-  cover <- vapply(metrics, `[[`, numeric(1), "coverage_all")
-  mcse <- vapply(metrics, `[[`, numeric(1), "mcse")
-  if (any(is.finite(finite) & finite < 0.80)) return("not validated")
-  if (all(finite >= 0.95) && all(abs(cover - 0.95) <= 2 * mcse)) "validated" else
-    "validated with reservations"
-}
-lines <- c(lines,
-  paste0("- **MLE log-Wald mean interval:** ", decision(c("mle", "delta")), "."),
-  paste0("- **MLE parametric percentile interval:** ", decision(c("mle", "parametric_bootstrap")),
-    "; UCL evaluated separately."),
-  paste0("- **ROS percentile interval:** ", decision(c("ros", "percentile")), "; full refit bootstrap."),
-  paste0("- **ROS basic interval:** ", decision(c("ros", "basic")), "; full refit bootstrap."),
-  paste0("- **Reverse-KM quantile bands:** ", reverse_decision(),
-    "; the mean is non-identifiable and no mean interval/UCL is calculated."),
-  "", "Failure rates and non-identifiability are retained in each stratum. A procedure returning finite intervals is not, by itself, considered validated. No Gamma misspecification scenario or primary Monte Carlo was run.", "")
+lines <- c(lines, "", "## Decision rules", "",
+  "Each experimental condition, method, estimand and interval type is classified separately. The coverage target is the nominal 0.95. A one-sided exact binomial test (`binom.test`, alternative = `less`, alpha = 0.05) identifies statistically significant undercoverage; that result is **not validated**. Availability is reported separately and must be at least 0.95 for validation. A procedure is **validated** only when the 90% exact binomial interval for coverage lies wholly within 0.93–0.97 (equivalence bounds of +/- 0.02 around nominal) and availability is at least 0.95. All other cases without significant undercoverage are **inconclusive**; failure to reject undercoverage alone is not evidence of validity.",
+  "", "Two-sided 95% mean intervals and one-sided 95% UCLs have separate decisions. Reverse-KM coverage is conditional on returning a finite interval for a theoretically identifiable quantile; its unconditional interval availability remains a separate metric. Structural non-identifiability is not assessed as coverage.",
+  "", "B=99 results remain preliminary pending targeted endpoint stability verification. The targeted B=99/B=499 supplement is reported separately in `reports/inference_bootstrap_stability.md`; it does not replace or recompute the six-condition coverage simulation.",
+  "", "No Gamma misspecification scenario or primary Monte Carlo was run.", "")
 writeLines(lines, "reports/inference_validation.md")
 cat("Wrote reports/inference_validation.md\n")
