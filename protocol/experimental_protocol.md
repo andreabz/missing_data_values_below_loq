@@ -29,7 +29,7 @@ The theoretical censoring probabilities are 0.10 and 0.40. LOQs remain fixed acr
 - Sample sizes: n = 30, 100, 500.
 - LOQ conditions: 10th and 40th percentiles.
 - Initial replicates: 2,000 per sample-size/LOQ combination.
-- Approved master seed: 20261122.
+- Approved master seed: 20261122L.
 - Total: six conditions and 12,000 generated samples.
 - Use the same generated sample for all applicable methods to enable paired comparisons.
 - For each replicate, generate the full latent sample, calculate its statistics, then apply the fixed scenario LOQ and run the methods. Compare each estimate with both the complete-sample statistic (paired sample truth) and the population parameter, stored as distinct references.
@@ -116,4 +116,4 @@ Estimator and inference evidence is summarized in `reports/estimator_validation.
 
 For reverse KM under the common LOQ, the mean is recorded as structurally non-identifiable and only quantiles returned by the fitted curve are considered; structural non-identifiability, sample non-estimability, and a missing returned quantile are kept separate. The runner rejects `inference = TRUE`; the primary run fixes `inference = FALSE` and has no inferential outcomes.
 
-The definitive lognormal Monte Carlo has not been launched. Its approved seed is `20261122`, its replicate count is fixed at 2,000 per condition, and its dedicated output directory is `results/primary_monte_carlo_lognormal_seed_20261122/`. The directory is reserved and contains no simulation results. After review, run `Rscript simulations/run_primary_monte_carlo.R` from the repository root. Do not execute it during preparation. The later Gamma misspecification scenario remains separate and is not part of this run.
+The definitive lognormal Monte Carlo has not been launched. Its approved seed is `20261122L`, its replicate count is fixed at 2,000 per condition, and its dedicated output directory is `results/primary_monte_carlo_lognormal_seed_20261122/`. The directory is reserved and contains no simulation results. After review, run `Rscript simulations/run_primary_monte_carlo.R` from the repository root. Do not execute it during preparation. The later Gamma misspecification scenario remains separate and is not part of this run.
